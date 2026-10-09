@@ -30,7 +30,7 @@
   let loaded = $state(false);
   let loadError = $state<string | null>(null);
 
-  let tab = $state<'box' | 'entry' | 'history'>('box');
+  let tab = $state<'box' | 'entry' | 'history'>(page.url.searchParams.has('zapis') ? 'entry' : 'box');
   let entryTeamId = $state<number | null>(null);
   let openPlayer = $state<string | null>(null);
   let busy = $state(false);
@@ -197,21 +197,21 @@
   {#if !game}
     <p class="empty">Zápas neexistuje.</p>
   {:else}
-    <section class="head" aria-label="Výsledek zápasu">
+    <section class="card head" aria-label="Výsledek zápasu" style:--home={home?.color} style:--away={away?.color}>
       <div class="side">
-        <TeamBadge team={home} size={44} eager />
+        <TeamBadge team={home} size={56} eager />
         <a class="tname" href="/tymy/{home?.id}">{home?.name}</a>
         <span class="role">domácí</span>
       </div>
       <div class="score">
         {#if game.home_score !== null && game.away_score !== null}
-          <span class="slot">{game.home_score}</span><span class="colon">:</span><span class="slot">{game.away_score}</span>
+          <span class="num-big" class:dim={game.home_score! < game.away_score!}>{game.home_score}</span><span class="colon">:</span><span class="num-big" class:dim={game.away_score! < game.home_score!}>{game.away_score}</span>
         {:else}
           <span class="vs">{time(game.starts_at) || '–'}</span>
         {/if}
       </div>
       <div class="side right">
-        <TeamBadge team={away} size={44} eager />
+        <TeamBadge team={away} size={56} eager />
         <a class="tname" href="/tymy/{away?.id}">{away?.name}</a>
         <span class="role">hosté</span>
       </div>
@@ -220,7 +220,7 @@
       </p>
     </section>
 
-    <div class="tabs" role="tablist" aria-label="Části zápasu">
+    <div class="seg tabs" role="tablist" aria-label="Části zápasu">
       <button type="button" role="tab" aria-selected={tab === 'box'} onclick={() => (tab = 'box')}>Box score</button>
       <button type="button" role="tab" aria-selected={tab === 'entry'} onclick={() => (tab = 'entry')}>Zapsat statistiky</button>
       <button type="button" role="tab" aria-selected={tab === 'history'} onclick={() => (tab = 'history')}>Historie</button>
@@ -382,39 +382,38 @@
     color: var(--muted);
     text-decoration: none;
     font-weight: 600;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
   }
   .back:hover {
     color: var(--ink);
   }
 
-  /* ---------- head: a small scoreboard */
+  /* ---------- head */
   .head {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    gap: 10px;
-    padding: 20px 14px 14px;
-    border-radius: var(--radius-l);
+    gap: 12px;
+    padding: 26px 16px 18px;
+    overflow: hidden;
     background:
-      repeating-linear-gradient(90deg, transparent 0 46px, rgb(255 255 255 / 0.025) 46px 48px),
-      var(--board);
-    color: var(--board-ink);
-    box-shadow: var(--shadow);
+      radial-gradient(80% 120% at 0% 0%, color-mix(in srgb, var(--home) 22%, transparent), transparent 60%),
+      radial-gradient(80% 120% at 100% 0%, color-mix(in srgb, var(--away) 22%, transparent), transparent 60%),
+      var(--surface);
   }
   .side {
     display: grid;
     justify-items: center;
-    gap: 8px;
+    gap: 10px;
     text-align: center;
     min-width: 0;
   }
   .tname {
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: clamp(18px, 4.6vw, 28px);
-    line-height: 1;
-    color: var(--board-ink);
+    font-size: clamp(17px, 3.6vw, 24px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
     text-decoration: none;
     overflow-wrap: anywhere;
   }
@@ -423,71 +422,45 @@
     text-underline-offset: 3px;
   }
   .role {
-    font-size: 12px;
-    color: var(--board-muted);
+    font-size: 12.5px;
+    color: var(--muted);
   }
   .score {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
-  .slot {
-    display: inline-block;
-    min-width: 1.4em;
-    padding: 4px 6px 1px;
-    border-radius: 6px;
-    background: var(--board-slot);
-    box-shadow: inset 0 3px 4px rgb(0 0 0 / 0.55);
-    font-family: var(--font-display);
+  .num-big {
+    font-size: clamp(48px, 12vw, 80px);
     font-weight: 800;
-    font-size: clamp(40px, 11vw, 64px);
+    letter-spacing: -0.05em;
     line-height: 1;
-    text-align: center;
-    color: var(--amber);
+  }
+  .num-big.dim {
+    color: var(--faint);
   }
   .colon {
-    font-family: var(--font-display);
     font-size: 36px;
-    color: var(--board-muted);
+    font-weight: 800;
+    color: var(--faint);
   }
   .vs {
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 30px;
-    color: var(--board-muted);
+    font-size: 28px;
+    color: var(--muted);
   }
   .info {
     grid-column: 1 / -1;
-    margin: 6px 0 0;
+    margin: 8px 0 0;
     text-align: center;
     font-size: 14px;
-    color: var(--board-muted);
+    color: var(--muted);
   }
 
   /* ---------- tabs */
   .tabs {
-    display: flex;
-    gap: 4px;
-    margin: 18px 0 18px;
-    border-bottom: 1px solid var(--line);
-    overflow-x: auto;
-  }
-  .tabs button {
-    all: unset;
-    cursor: pointer;
-    padding: 10px 12px;
-    font-weight: 600;
-    color: var(--muted);
-    border-bottom: 3px solid transparent;
-    margin-bottom: -1px;
-    white-space: nowrap;
-  }
-  .tabs button[aria-selected='true'] {
-    color: var(--ink);
-    border-bottom-color: var(--amber);
-  }
-  .tabs button:focus-visible {
-    outline: 2px solid var(--focus);
+    margin: 18px 0 20px;
+    max-width: 520px;
   }
   .loading {
     padding: 20px 0;
@@ -495,17 +468,16 @@
 
   /* ---------- box score */
   .box {
-    margin-bottom: 28px;
+    margin-bottom: 32px;
   }
   .box h2 {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 24px;
-    margin-bottom: 10px;
+    gap: 12px;
+    margin-bottom: 12px;
   }
   .box .empty p {
-    margin: 0 0 12px;
+    margin: 0 0 14px;
   }
   .pl {
     text-decoration: none;
@@ -523,19 +495,20 @@
   .team-switch {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 10px;
   }
   .tsw {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 12px;
-    border-radius: var(--radius-m);
-    border: 1px solid var(--line-strong);
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
     background: var(--surface);
-    font-weight: 700;
+    font-weight: 800;
     cursor: pointer;
     min-width: 0;
+    transition: border-color 160ms, background-color 160ms;
   }
   .tsw span {
     overflow: hidden;
@@ -544,29 +517,29 @@
   }
   .tsw[aria-pressed='true'] {
     border-color: var(--team);
-    box-shadow: inset 0 0 0 1px var(--team);
-    background: color-mix(in srgb, var(--team) 10%, var(--surface));
+    background: color-mix(in srgb, var(--team) 14%, var(--surface));
   }
   .hint {
     font-size: 14px;
-    margin: 12px 0 14px;
+    margin: 14px 0 16px;
     max-width: 70ch;
   }
 
   .players {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 6px;
     border: 1px solid var(--line);
-    border-radius: var(--radius-m);
+    border-radius: var(--r-l);
     background: var(--surface);
-    overflow: hidden;
+    box-shadow: var(--shadow);
   }
   .players > li {
-    border-bottom: 1px solid var(--line);
+    border-radius: 14px;
+    transition: background-color 160ms;
   }
-  .players > li:last-child {
-    border-bottom: none;
+  .players > li + li {
+    margin-top: 2px;
   }
   .players > li.open {
     background: var(--surface-2);
@@ -576,27 +549,34 @@
     all: unset;
     box-sizing: border-box;
     display: grid;
-    grid-template-columns: 34px 1fr auto 20px;
+    grid-template-columns: 36px 1fr auto 20px;
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 12px 14px;
+    padding: 12px 12px;
     cursor: pointer;
-    min-height: 52px;
+    min-height: 54px;
+    border-radius: 14px;
+  }
+  .phead:hover {
+    background: var(--surface-2);
   }
   .phead:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
   .jn {
-    font-family: var(--font-display);
+    display: grid;
+    place-items: center;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--surface-3);
     font-weight: 800;
-    font-size: 20px;
+    font-size: 15px;
     color: var(--muted);
-    text-align: center;
   }
   .pn {
-    font-weight: 600;
+    font-weight: 700;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -621,50 +601,59 @@
   }
 
   .pbody {
-    padding: 0 14px 16px;
+    padding: 2px 12px 16px;
   }
   .pad {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+    gap: 8px;
   }
   .res {
     display: grid;
-    gap: 1px;
+    gap: 2px;
     justify-items: start;
-    padding: 8px 8px 7px 10px;
-    min-height: 56px;
-    border-radius: 8px;
-    border: 1px solid var(--line-strong);
-    border-left: 5px solid var(--faint);
+    padding: 10px 10px 9px 12px;
+    min-height: 60px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
     background: var(--surface);
     cursor: pointer;
     text-align: left;
-    transition: transform 80ms, background-color 120ms;
+    position: relative;
+    overflow: hidden;
+    transition: transform 90ms, background-color 140ms, border-color 140ms;
+  }
+  .res::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--faint);
   }
   .res:hover {
-    background: var(--bg);
+    border-color: var(--line-strong);
+    background: var(--surface-3);
   }
   .res:active {
-    transform: scale(0.97);
+    transform: scale(0.96);
   }
   .res[disabled] {
     opacity: 0.55;
     cursor: progress;
   }
-  .g-hit {
-    border-left-color: var(--ok);
+  .res.g-hit::before {
+    background: var(--pos);
   }
-  .g-onbase {
-    border-left-color: var(--amber);
-  }
-  .g-out {
-    border-left-color: var(--faint);
+  .res.g-onbase::before {
+    background: var(--accent);
   }
   .code {
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 22px;
+    font-size: 20px;
+    letter-spacing: -0.02em;
     line-height: 1;
   }
   .lbl {
@@ -683,15 +672,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 6px 4px 12px;
+    padding: 4px 4px 4px 14px;
     border-radius: 999px;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line);
     background: var(--surface);
   }
   .clabel {
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 18px;
+    font-size: 15px;
     margin-right: 4px;
   }
   .counter button,
@@ -699,24 +687,28 @@
   .del {
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 1px solid var(--line);
-    background: var(--surface-2);
+    border: 0;
+    background: var(--surface-3);
     cursor: pointer;
     color: var(--ink);
+  }
+  .counter button:hover,
+  .rbi button:hover {
+    background: var(--line-strong);
   }
   .counter button[disabled],
   .rbi button[disabled],
   .del[disabled] {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: default;
   }
   .cval {
     min-width: 22px;
     text-align: center;
-    font-weight: 700;
+    font-weight: 800;
     font-size: 17px;
   }
 
@@ -732,21 +724,28 @@
     grid-template-columns: 24px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 8px;
-    padding: 6px 6px 6px 10px;
-    border-radius: 8px;
+    padding: 6px 6px 6px 12px;
+    border-radius: 14px;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-left: 4px solid var(--faint);
+    border-left: 3px solid var(--faint);
+  }
+  .pas li.g-hit {
+    border-left-color: var(--pos);
+  }
+  .pas li.g-onbase {
+    border-left-color: var(--accent);
   }
   .order {
     font-size: 13px;
     color: var(--muted);
   }
   .rsel {
-    min-height: 34px;
-    padding: 4px 8px;
+    min-height: 36px;
+    padding: 4px 10px;
     width: 100%;
-    font-weight: 600;
+    font-weight: 700;
+    background: var(--surface-2);
   }
   .rbi {
     display: flex;
@@ -759,22 +758,24 @@
     margin-right: 2px;
   }
   .rbi button {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
   }
   .rv {
     min-width: 16px;
     text-align: center;
-    font-weight: 700;
+    font-weight: 800;
   }
   .del {
-    color: var(--red);
+    color: var(--neg);
     background: transparent;
-    border-color: transparent;
+  }
+  .del:hover {
+    background: var(--neg-soft);
   }
 
   .addp {
-    margin-top: 12px;
+    margin-top: 14px;
   }
   .addp form {
     display: flex;
@@ -788,7 +789,7 @@
     flex: 0 1 90px;
   }
 
-  @media (max-width: 420px) {
+  @media (max-width: 440px) {
     .pad {
       grid-template-columns: repeat(3, 1fr);
     }
@@ -797,6 +798,10 @@
     }
     .rl {
       display: none;
+    }
+    .head {
+      padding: 22px 10px 16px;
+      gap: 6px;
     }
   }
 </style>

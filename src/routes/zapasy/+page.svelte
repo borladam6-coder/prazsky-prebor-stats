@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { league } from '#lib/league.svelte.ts';
   import { month } from '#lib/format.ts';
-  import GameRow from '#lib/components/GameRow.svelte';
+  import GameCard from '#lib/components/GameCard.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
 
   type View = 'odehrane' | 'nadchazejici' | 'vse';
@@ -58,9 +58,9 @@
   <p class="lead muted">Vyber odehraný zápas, otevře se jeho box score a dají se do něj zapisovat statistiky.</p>
 
   <div class="filters">
-    <div class="seg" role="group" aria-label="Které zápasy">
+    <div class="seg views" role="group" aria-label="Které zápasy">
       {#each views as v (v.id)}
-        <button type="button" class="chip" aria-pressed={view === v.id} onclick={() => setParam('stav', v.id === 'odehrane' ? null : v.id)}>
+        <button type="button" aria-pressed={view === v.id} onclick={() => setParam('stav', v.id === 'odehrane' ? null : v.id)}>
           {v.label}
         </button>
       {/each}
@@ -83,9 +83,11 @@
     {#each groups as grp (grp.label)}
       <section class="month">
         <h2>{grp.label}</h2>
-        <div class="panel list">
-          {#each grp.items as g (g.id)}
-            <GameRow game={g} recorded={league.recorded.get(g.id) ?? 0} focusTeam={teamId} />
+        <div class="cards">
+          {#each grp.items as g, i (g.id)}
+            <div class="rise" style:--i={Math.min(i, 8)}>
+              <GameCard game={g} recorded={league.recorded.get(g.id) ?? 0} focusTeam={teamId} />
+            </div>
           {/each}
         </div>
       </section>
@@ -95,21 +97,24 @@
 
 <style>
   .lead {
-    margin: 10px 0 20px;
+    margin: 14px 0 24px;
     max-width: 60ch;
+    font-size: 17px;
   }
   .filters {
     display: grid;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 8px;
   }
-  .seg,
+  .views {
+    max-width: 420px;
+  }
   .teams {
     display: flex;
     gap: 6px;
     overflow-x: auto;
     margin: 0 calc(var(--gutter) * -1);
-    padding: 2px var(--gutter) 4px;
+    padding: 2px var(--gutter) 6px;
     scrollbar-width: none;
   }
   .teams::-webkit-scrollbar {
@@ -119,16 +124,27 @@
     padding-left: 6px;
   }
   .month {
-    margin-top: 26px;
+    margin-top: 32px;
   }
   .month h2 {
-    font-size: 24px;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
   }
-  .list {
-    overflow: hidden;
+  .cards {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
-  .list :global(.row:last-child) {
-    border-bottom: none;
+  .cards > div {
+    display: grid;
+  }
+  @media (min-width: 620px) {
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1000px) {
+    .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 </style>

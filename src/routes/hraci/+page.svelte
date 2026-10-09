@@ -94,7 +94,8 @@
 
 <style>
   .lead {
-    margin: 10px 0 20px;
+    margin: 14px 0 24px;
+    font-size: 17px;
     max-width: 65ch;
   }
   .search {

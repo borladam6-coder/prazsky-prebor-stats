@@ -119,7 +119,7 @@
     margin: 0;
     padding: 0;
     border: 1px solid var(--line);
-    border-radius: var(--radius-m);
+    border-radius: var(--r-l);
     background: var(--surface);
     overflow: hidden;
   }
@@ -158,7 +158,7 @@
     color: var(--muted);
   }
   .tag {
-    color: var(--amber-ink);
+    color: var(--accent-text);
     font-weight: 700;
   }
   li.reverted .title {

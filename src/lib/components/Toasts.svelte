@@ -39,15 +39,16 @@
     align-items: center;
     gap: 12px;
     padding: 12px 14px;
-    border-radius: var(--radius-m);
-    background: var(--board);
-    color: var(--board-ink);
+    border-radius: 16px;
+    background: var(--surface-3);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
     box-shadow: var(--shadow);
     font-size: 15px;
-    border-left: 4px solid var(--ok);
+    border-left: 4px solid var(--pos);
   }
   .toast.error {
-    border-left-color: var(--red);
+    border-left-color: var(--neg);
   }
   span {
     flex: 1;
@@ -56,13 +57,13 @@
     all: unset;
     cursor: pointer;
     font-weight: 700;
-    color: var(--amber);
+    color: var(--accent-text);
   }
   button:focus-visible {
-    outline: 2px solid var(--amber);
+    outline: 2px solid var(--focus);
   }
   .x {
-    color: var(--board-muted);
+    color: var(--muted);
     font-size: 20px;
     line-height: 1;
     padding: 0 2px;

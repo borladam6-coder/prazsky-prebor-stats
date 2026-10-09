@@ -32,16 +32,16 @@
 
 <svelte:head>
   <link rel="icon" href={favicon} />
-  <meta name="theme-color" content="#17352a" />
+  <meta name="theme-color" content="#0a0b0a" />
   <meta name="description" content="Komunitní pálkařské statistiky Pražského přeboru mužů v softballu." />
 </svelte:head>
 
 <a class="skip" href="#main">Přeskočit na obsah</a>
 
-<header class="top">
-  <div class="top-inner">
+<div class="top-wrap">
+  <header class="top">
     <a class="brand" href="/" aria-label="Pražský přebor, přehled">
-      <img src={favicon} alt="" width="32" height="32" />
+      <img src={favicon} alt="" width="30" height="30" />
       <span class="word">Pražský přebor</span>
       {#if league.season}<span class="year">{league.season.year}</span>{/if}
     </a>
@@ -53,16 +53,16 @@
     </nav>
 
     <button type="button" class="theme" onclick={() => theme.toggle()} aria-label={themeLabel} title={themeLabel}>
-      <Icon name={theme.mode === 'system' ? 'auto' : theme.mode === 'light' ? 'sun' : 'moon'} />
+      <Icon name={theme.mode === 'system' ? 'auto' : theme.mode === 'light' ? 'sun' : 'moon'} size={19} />
     </button>
-  </div>
-</header>
+  </header>
+</div>
 
 <main id="main">
   {#if data.loadError}
     <div class="page">
-      <div class="load-error" role="alert">
-        <h1>Data se nepodařilo načíst</h1>
+      <div class="load-error card" role="alert">
+        <h2>Data se nepodařilo načíst</h2>
         <p>{data.loadError}</p>
         <button type="button" class="btn btn-primary" onclick={() => location.reload()}>Zkusit znovu</button>
       </div>
@@ -72,6 +72,15 @@
   {/if}
 </main>
 
+<footer class="foot">
+  <span>{league.season?.name ?? 'Pražský přebor mužů'} {league.season?.year ?? ''}, komunitní statistiky</span>
+  <a class="link-accent" href="/historie">Historie změn</a>
+  <p class="note">
+    Bez napojení na Českou softballovou asociaci. Tabulka, rozpis a soupisky pochází z
+    <a href="https://softball.cz/ligy/PPM" rel="noopener">softball.cz</a>, pálkařské statistiky zapisují hráči sami.
+  </p>
+</footer>
+
 <nav class="nav-mobile" aria-label="Hlavní">
   {#each nav as item (item.href)}
     <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
@@ -80,13 +89,6 @@
     </a>
   {/each}
 </nav>
-
-<footer class="foot">
-  <p>
-    Komunitní projekt bez napojení na Českou softballovou asociaci. Tabulka, rozpis a soupisky pochází z
-    <a href="https://softball.cz/ligy/PPM" rel="noopener">softball.cz</a>, pálkařské statistiky zapisují hráči sami.
-  </p>
-</footer>
 
 <NicknameDialog />
 <Toasts />
@@ -98,31 +100,35 @@
     top: -60px;
     z-index: 100;
     padding: 8px 12px;
-    background: var(--amber);
-    color: #10241b;
-    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 8px;
     font-weight: 700;
   }
   .skip:focus {
     top: 8px;
   }
 
-  .top {
+  .top-wrap {
     position: sticky;
     top: 0;
     z-index: 20;
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: saturate(1.4) blur(10px);
-    border-bottom: 1px solid var(--line);
+    padding: 12px var(--gutter) 0;
+    padding-top: calc(12px + env(safe-area-inset-top));
   }
-  .top-inner {
+  .top {
     max-width: var(--max);
     margin: 0 auto;
-    padding: 10px var(--gutter);
-    padding-top: calc(10px + env(safe-area-inset-top));
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
+    padding: 8px 8px 8px 14px;
+    border-radius: 22px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
   }
   .brand {
     display: flex;
@@ -132,49 +138,48 @@
     margin-right: auto;
   }
   .word {
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 24px;
-    line-height: 1;
+    font-size: 19px;
+    letter-spacing: -0.02em;
   }
   .year {
-    font-family: var(--font-display);
     font-weight: 700;
-    font-size: 16px;
-    color: var(--amber-ink);
-    border: 1.5px solid currentColor;
-    border-radius: 4px;
-    padding: 1px 5px 0;
+    font-size: 12.5px;
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 2px 9px;
   }
 
   .nav-desktop {
     display: none;
-    gap: 4px;
+    gap: 2px;
   }
   .nav-desktop a {
-    padding: 8px 12px;
-    border-radius: 8px;
+    padding: 10px 18px;
+    border-radius: 999px;
     text-decoration: none;
     font-weight: 600;
+    font-size: 15px;
     color: var(--muted);
+    transition: color 140ms, background-color 140ms;
   }
   .nav-desktop a:hover {
     color: var(--ink);
   }
   .nav-desktop a[aria-current='page'] {
-    color: var(--ink);
-    background: var(--surface);
-    box-shadow: inset 0 -2px 0 var(--amber);
+    color: var(--pill-active-ink);
+    background: var(--pill-active-bg);
   }
 
   .theme {
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
     border: 1px solid var(--line);
-    background: var(--surface);
+    background: var(--surface-2);
     color: var(--ink);
     cursor: pointer;
   }
@@ -188,22 +193,24 @@
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     padding-bottom: env(safe-area-inset-bottom);
-    background: var(--board);
-    border-top: 1px solid rgb(255 255 255 / 0.06);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-top: 1px solid var(--line);
   }
   .nav-mobile a {
     display: grid;
     justify-items: center;
-    gap: 2px;
+    gap: 3px;
     padding: 9px 2px 8px;
     min-height: var(--nav-h);
-    color: var(--board-muted);
+    color: var(--faint);
     text-decoration: none;
     font-size: 11.5px;
-    font-weight: 600;
+    font-weight: 700;
   }
   .nav-mobile a[aria-current='page'] {
-    color: var(--amber);
+    color: var(--accent-text);
   }
 
   @media (min-width: 900px) {
@@ -217,16 +224,20 @@
 
   .foot {
     max-width: var(--max);
-    margin: 0 auto;
-    padding: 0 var(--gutter) calc(var(--nav-h) + 32px);
+    margin: 24px auto 0;
+    padding: 24px var(--gutter) calc(var(--nav-h) + 28px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 20px;
+    font-size: 14px;
     color: var(--faint);
-    font-size: 13px;
   }
-  .foot p {
-    max-width: 70ch;
-    border-top: 1px solid var(--line);
-    padding-top: 16px;
+  .note {
+    flex-basis: 100%;
     margin: 0;
+    max-width: 70ch;
+    font-size: 13px;
   }
   @media (min-width: 900px) {
     .foot {
@@ -236,7 +247,7 @@
 
   .load-error {
     max-width: 560px;
-    padding: 28px 0;
+    padding: 28px;
   }
   .load-error p {
     color: var(--muted);

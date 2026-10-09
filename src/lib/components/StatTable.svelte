@@ -129,21 +129,21 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     border: 1px solid var(--line);
-    border-radius: var(--radius-m);
+    border-radius: var(--r-l);
     background: var(--surface);
+    box-shadow: var(--shadow);
     overscroll-behavior-x: contain;
   }
   table {
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
-    font-size: 14px;
+    font-size: 14.5px;
     font-variant-numeric: tabular-nums;
-    font-stretch: 92%;
   }
   th,
   td {
-    padding: 9px 10px;
+    padding: 11px 10px;
     text-align: right;
     white-space: nowrap;
     border-bottom: 1px solid var(--line);
@@ -157,12 +157,10 @@
     position: sticky;
     top: 0;
     z-index: 2;
-    background: var(--board);
-    color: var(--board-muted);
+    color: var(--faint);
     font-weight: 600;
     font-size: 12.5px;
     padding: 0;
-    border-bottom: none;
   }
   thead th button {
     all: unset;
@@ -172,50 +170,56 @@
     align-items: center;
     gap: 2px;
     width: 100%;
-    padding: 10px 10px;
+    padding: 14px 10px 10px;
     cursor: pointer;
-    letter-spacing: 0.02em;
+  }
+  thead th button:hover {
+    color: var(--ink);
   }
   thead th button:focus-visible {
-    outline: 2px solid var(--amber);
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
   thead th.name button {
     justify-content: flex-start;
   }
   thead th.active {
-    color: var(--amber);
+    color: var(--accent-text);
   }
   .arrow {
     width: 0.7em;
-    font-size: 11px;
+    font-size: 10px;
   }
   .name {
     position: sticky;
     left: 0;
     z-index: 1;
     text-align: left;
-    font-weight: 500;
-    min-width: 150px;
-    max-width: 220px;
+    font-weight: 600;
+    min-width: 160px;
+    max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
-    box-shadow: 1px 0 0 var(--line);
+    padding-left: 16px;
   }
   thead th.name {
     z-index: 3;
-    color: var(--board-muted);
-    padding-left: 0;
+    padding-left: 6px;
   }
   thead th.name:not(:has(button)) {
-    padding: 10px;
+    padding: 14px 10px 10px 16px;
   }
   td.active {
     background: var(--surface-2);
-    font-weight: 700;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  td {
+    color: var(--muted);
   }
   td.rate {
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
   }
   tbody tr:hover th,
   tbody tr:hover td {
@@ -223,19 +227,21 @@
   }
   tfoot th,
   tfoot td {
-    font-weight: 700;
+    font-weight: 800;
+    color: var(--ink);
     background: var(--surface-2);
-    border-top: 2px solid var(--line-strong);
+    border-top: 1px solid var(--line-strong);
     border-bottom: none;
   }
   @media (max-width: 520px) {
     th,
     td {
-      padding: 8px 7px;
+      padding: 10px 8px;
     }
     .name {
-      min-width: 128px;
-      max-width: 150px;
+      min-width: 132px;
+      max-width: 160px;
+      padding-left: 12px;
     }
   }
 </style>

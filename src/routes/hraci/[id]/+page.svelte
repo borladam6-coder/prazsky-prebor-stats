@@ -51,7 +51,7 @@
   {#if !player}
     <p class="empty">Hráč neexistuje.</p>
   {:else}
-    <header class="head" style:--team={team?.color}>
+    <header class="card head" style:--team={team?.color}>
       <span class="jersey" aria-label="Číslo dresu">{player.jersey_number ?? '–'}</span>
       <div class="who">
         <h1>{player.name}</h1>
@@ -74,8 +74,8 @@
       </div>
     {:else}
       <section class="tiles" aria-label="Sezóna">
-        {#each tiles as k (k)}
-          <div class="tile" title={STATS[k].title}>
+        {#each tiles as k, i (k)}
+          <div class="card tile rise" style:--i={i} title={STATS[k].title}>
             <span class="tv">{rate(season[k])}</span>
             <span class="tl">{STATS[k].label}</span>
           </div>
@@ -122,13 +122,20 @@
     color: var(--muted);
     text-decoration: none;
     font-weight: 600;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .back:hover {
+    color: var(--ink);
   }
   .head {
     display: flex;
     align-items: center;
-    gap: 18px;
-    margin-bottom: 22px;
+    gap: 20px;
+    padding: 24px;
+    margin-bottom: 14px;
+    background:
+      radial-gradient(70% 160% at 0% 0%, color-mix(in srgb, var(--team, var(--faint)) 26%, transparent), transparent 60%),
+      var(--surface);
   }
   .jersey {
     display: grid;
@@ -136,26 +143,26 @@
     width: 76px;
     height: 76px;
     flex-shrink: 0;
-    border-radius: 16px;
-    background: var(--team, var(--board));
+    border-radius: 22px;
+    background: var(--team, var(--surface-3));
     color: #fff;
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 44px;
-    text-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+    font-size: 36px;
+    letter-spacing: -0.04em;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   }
   .who {
     min-width: 0;
   }
   h1 {
-    font-size: clamp(30px, 7.5vw, 52px);
+    font-size: clamp(28px, 6vw, 48px);
     overflow-wrap: anywhere;
   }
   .team {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 10px;
     color: var(--muted);
     text-decoration: none;
     font-weight: 600;
@@ -166,59 +173,58 @@
 
   .tiles {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    padding: 10px;
-    border-radius: var(--radius-l);
-    background: var(--board);
-    box-shadow: var(--shadow);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (min-width: 720px) {
+    .tiles {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
   }
   .tile {
     display: grid;
-    justify-items: center;
     gap: 6px;
-    padding: 12px 4px 10px;
-    border-radius: 8px;
-    background: var(--board-slot);
-    box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.5);
+    padding: 18px 20px;
   }
   .tv {
-    font-family: var(--font-display);
+    font-size: clamp(34px, 7vw, 48px);
     font-weight: 800;
-    font-size: clamp(28px, 8vw, 44px);
+    letter-spacing: -0.04em;
     line-height: 1;
-    color: var(--amber);
+  }
+  .tile:last-child .tv {
+    color: var(--accent-text);
   }
   .tl {
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 15px;
-    color: var(--board-muted);
+    order: -1;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--muted);
   }
 
   .counts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 8px;
     margin: 12px 0 0;
   }
   .counts div {
-    padding: 8px 10px;
-    border-radius: 8px;
+    padding: 10px 14px;
+    border-radius: 14px;
     background: var(--surface);
     border: 1px solid var(--line);
   }
   dt {
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 12.5px;
+    font-weight: 600;
     color: var(--muted);
   }
   dd {
     margin: 0;
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 24px;
-    line-height: 1.1;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
   .game {
     display: flex;
@@ -227,9 +233,20 @@
   }
   .game .d {
     color: var(--muted);
-    min-width: 54px;
+    min-width: 58px;
   }
   .game:hover .o {
     text-decoration: underline;
+  }
+  @media (max-width: 520px) {
+    .head {
+      padding: 18px;
+      gap: 14px;
+    }
+    .jersey {
+      width: 62px;
+      height: 62px;
+      font-size: 28px;
+    }
   }
 </style>

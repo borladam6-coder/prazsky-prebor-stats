@@ -3,16 +3,12 @@
 
   let { team, size = 32, eager = false }: { team: Team | undefined; size?: number; eager?: boolean } = $props();
 
-  // Logos are hosted by the association. If one fails to load, fall back to the team code.
+  // Logos are hosted by the association. If one is missing or fails, show the team's initials.
   let failed = $state(false);
+  const initials = $derived((team?.code ?? '?').slice(0, 2).toUpperCase());
 </script>
 
-<span
-  class="badge"
-  style:--size="{size}px"
-  style:--team={team?.color ?? 'var(--faint)'}
-  title={team?.name}
->
+<span class="badge" class:logo={team?.logo_url && !failed} style:--size="{size}px" style:--team={team?.color ?? 'var(--faint)'} title={team?.name}>
   {#if team?.logo_url && !failed}
     <img
       src={team.logo_url}
@@ -25,40 +21,34 @@
       onerror={() => (failed = true)}
     />
   {:else}
-    <span class="code">{team?.code.slice(0, 4) ?? '?'}</span>
+    <span class="ini">{initials}</span>
   {/if}
 </span>
 
 <style>
   .badge {
-    position: relative;
     display: inline-grid;
     place-items: center;
     flex-shrink: 0;
     width: var(--size);
     height: var(--size);
-    border-radius: 28%;
-    background: #fff;
-    box-shadow:
-      0 0 0 2px var(--team),
-      0 1px 2px rgb(0 0 0 / 0.2);
+    border-radius: calc(var(--size) * 0.28);
+    background: var(--team);
     overflow: hidden;
   }
+  .badge.logo {
+    background: #fff;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  }
   img {
-    width: 84%;
-    height: 84%;
+    width: 80%;
+    height: 80%;
     object-fit: contain;
   }
-  .code {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    place-items: center;
-    background: var(--team);
+  .ini {
     color: #fff;
-    font-family: var(--font-display);
     font-weight: 800;
     font-size: calc(var(--size) * 0.36);
-    letter-spacing: 0.02em;
+    letter-spacing: -0.02em;
   }
 </style>

@@ -12,7 +12,7 @@
   import type { Player, PlayerTotals, TeamTotals } from '#lib/types.ts';
   import StatTable from '#lib/components/StatTable.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
-  import GameRow from '#lib/components/GameRow.svelte';
+  import GameCard from '#lib/components/GameCard.svelte';
   import Filters from '#lib/components/Filters.svelte';
   import Icon from '#lib/components/Icon.svelte';
 
@@ -140,8 +140,8 @@
   {#if !team}
     <p class="empty">Tým neexistuje.</p>
   {:else}
-    <header class="head" style:--team={team.color}>
-      <TeamBadge {team} size={72} eager />
+    <header class="card head" style:--team={team.color}>
+      <TeamBadge {team} size={76} eager />
       <div>
         <h1>{team.name}</h1>
         {#if standing}
@@ -153,7 +153,7 @@
       </div>
     </header>
 
-    <div class="tabs" role="tablist" aria-label="Části týmu">
+    <div class="seg tabs" role="tablist" aria-label="Části týmu">
       <button type="button" role="tab" aria-selected={tab === 'stats'} onclick={() => (tab = 'stats')}>Statistiky</button>
       <button type="button" role="tab" aria-selected={tab === 'games'} onclick={() => (tab = 'games')}>Zápasy</button>
       <button type="button" role="tab" aria-selected={tab === 'roster'} onclick={() => (tab = 'roster')}>Soupiska</button>
@@ -189,9 +189,9 @@
         {/if}
       </div>
     {:else if tab === 'games'}
-      <div class="panel list" in:fade={{ duration: 150 }}>
+      <div class="cards" in:fade={{ duration: 150 }}>
         {#each games as g (g.id)}
-          <GameRow game={g} recorded={league.recorded.get(g.id) ?? 0} focusTeam={id} />
+          <GameCard game={g} recorded={league.recorded.get(g.id) ?? 0} focusTeam={id} />
         {:else}
           <p class="empty">Žádné zápasy.</p>
         {/each}
@@ -204,7 +204,7 @@
           <button type="submit" class="btn btn-primary" disabled={busy}><Icon name="plus" size={18} /> Přidat hráče</button>
         </form>
 
-        <ul class="roster">
+        <ul class="card roster">
           {#each roster as p (p.id)}
             <li class:inactive={!p.active} transition:slide={{ duration: 160 }}>
               {#if editing === p.id}
@@ -244,49 +244,34 @@
     color: var(--muted);
     text-decoration: none;
     font-weight: 600;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .back:hover {
+    color: var(--ink);
   }
   .head {
     display: flex;
     align-items: center;
-    gap: 18px;
-    padding-bottom: 18px;
-    border-bottom: 4px solid var(--team);
+    gap: 20px;
+    padding: 24px;
+    background:
+      radial-gradient(70% 160% at 0% 0%, color-mix(in srgb, var(--team) 26%, transparent), transparent 60%),
+      var(--surface);
   }
   .head h1 {
-    font-size: clamp(32px, 8vw, 56px);
+    font-size: clamp(30px, 6vw, 52px);
   }
   .rec {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     color: var(--muted);
   }
   .pos {
-    font-family: var(--font-display);
     font-weight: 800;
-    font-size: 20px;
-    color: var(--ink);
+    color: var(--accent-text);
   }
   .tabs {
-    display: flex;
-    gap: 4px;
-    margin: 18px 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .tabs button {
-    all: unset;
-    cursor: pointer;
-    padding: 10px 12px;
-    font-weight: 600;
-    color: var(--muted);
-    border-bottom: 3px solid transparent;
-    margin-bottom: -1px;
-  }
-  .tabs button[aria-selected='true'] {
-    color: var(--ink);
-    border-bottom-color: var(--amber);
-  }
-  .tabs button:focus-visible {
-    outline: 2px solid var(--focus);
+    margin: 18px 0 20px;
+    max-width: 460px;
   }
   .pl {
     text-decoration: none;
@@ -301,13 +286,22 @@
   }
   .note {
     font-size: 13px;
-    margin-top: 10px;
+    margin-top: 12px;
   }
-  .list {
-    overflow: hidden;
+  .cards {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
   }
-  .list :global(.row:last-child) {
-    border-bottom: none;
+  @media (min-width: 620px) {
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1000px) {
+    .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .add {
@@ -320,52 +314,56 @@
     flex: 1 1 200px;
   }
   .num-in {
-    flex: 0 0 76px;
-    width: 76px;
+    flex: 0 0 84px;
+    width: 84px;
   }
   .roster {
     list-style: none;
     margin: 0;
-    padding: 0;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-m);
-    background: var(--surface);
+    padding: 6px;
   }
   .roster li {
     display: grid;
-    grid-template-columns: 36px 1fr auto auto;
+    grid-template-columns: 40px 1fr auto auto;
     align-items: center;
-    gap: 10px;
-    padding: 6px 8px 6px 12px;
-    border-bottom: 1px solid var(--line);
-    min-height: 52px;
+    gap: 12px;
+    padding: 6px 6px 6px 8px;
+    border-radius: 14px;
+    min-height: 54px;
   }
-  .roster li:last-child {
-    border-bottom: none;
+  .roster li:hover {
+    background: var(--surface-2);
   }
   .roster li.inactive {
     color: var(--faint);
   }
   .jn {
-    font-family: var(--font-display);
+    display: grid;
+    place-items: center;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--surface-3);
     font-weight: 800;
-    font-size: 20px;
-    text-align: center;
+    font-size: 15px;
+    color: var(--muted);
   }
   .pn {
-    font-weight: 600;
+    font-weight: 700;
     text-decoration: none;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .pn:hover {
+    text-decoration: underline;
+  }
   .inactive .pn {
-    font-weight: 400;
+    font-weight: 500;
     text-decoration: line-through;
   }
   .src {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--faint);
   }
   .acts {
@@ -386,7 +384,11 @@
       display: none;
     }
     .roster li {
-      grid-template-columns: 32px 1fr auto;
+      grid-template-columns: 36px 1fr auto;
+    }
+    .head {
+      padding: 18px;
+      gap: 14px;
     }
   }
 </style>

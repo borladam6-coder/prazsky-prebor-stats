@@ -59,7 +59,7 @@
   dialog {
     width: min(420px, calc(100vw - 32px));
     border: 1px solid var(--line);
-    border-radius: var(--radius-l);
+    border-radius: var(--r-l);
     background: var(--surface);
     color: var(--ink);
     padding: 22px;
@@ -81,7 +81,7 @@
     font-size: 14px;
   }
   .error {
-    color: var(--red);
+    color: var(--neg);
     margin: 8px 0 0;
   }
   .actions {
