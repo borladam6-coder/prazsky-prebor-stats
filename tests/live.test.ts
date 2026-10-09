@@ -354,3 +354,46 @@ test('simulation: browser logic and database agree play by play', async () => {
 
   assert.deepEqual(await t.as('anon', CONSISTENCY), []);
 });
+
+test('both teams on one device: undo without a team reverts the latest play of the game', async () => {
+  const [g2] = await t.q(`select * from games where status = 'played' and id <> $1 order by id desc limit 1`, [game.id]);
+  const order = async (team: number) =>
+    (await t.q(`select id from players where team_id = $1 and active order by name limit 9`, [team])).map((p) => p.id);
+  const dual = t.newCaller('Oba týmy');
+  await t.rpc(dual, 'live_start', { p_game_id: g2.id, p_team_id: g2.away_team_id, p_lineup: await order(g2.away_team_id) });
+  await t.rpc(dual, 'live_start', { p_game_id: g2.id, p_team_id: g2.home_team_id, p_lineup: await order(g2.home_team_id) });
+
+  const sess = async (team: number) =>
+    (await t.q(`select * from live_sessions where game_id = $1 and team_id = $2`, [g2.id, team]))[0];
+  const hit = async (team: number, result: string, batterTo: number, runners: unknown[] = []) => {
+    const s = await sess(team);
+    await t.rpc(dual, 'live_play', {
+      p_game_id: g2.id, p_team_id: team, p_expected_version: s.version, p_result: result,
+      p_batter_to: batterTo, p_runners: JSON.stringify(runners), p_rbi: null
+    });
+  };
+
+  // top of the 1st: away makes three outs → inning 2 for away, home bats next
+  await hit(g2.away_team_id, 'K', 0);
+  await hit(g2.away_team_id, 'OUT', 0);
+  await hit(g2.away_team_id, 'OUT', 0);
+  assert.equal((await sess(g2.away_team_id)).inning, 2);
+  assert.equal((await sess(g2.home_team_id)).inning, 1);
+  await hit(g2.home_team_id, '1B', 1);
+
+  const undoGame = () => t.rpc(dual, 'live_undo', { p_game_id: g2.id, p_team_id: null });
+  let s = await undoGame();
+  assert.equal(s.team_id, g2.home_team_id, 'home single undone first');
+  assert.equal((await sess(g2.home_team_id)).runner_1, null);
+  s = await undoGame();
+  assert.equal(s.team_id, g2.away_team_id, 'then the third out of the away team');
+  assert.equal(s.inning, 1);
+  assert.equal(s.outs, 2);
+
+  // undo for one team still only touches that team
+  await hit(g2.home_team_id, '1B', 1);
+  s = await t.rpc(dual, 'live_undo', { p_game_id: g2.id, p_team_id: g2.away_team_id });
+  assert.equal(s.outs, 1);
+  assert.ok((await sess(g2.home_team_id)).runner_1, 'home runner untouched');
+  assert.deepEqual(await t.as('anon', CONSISTENCY), []);
+});

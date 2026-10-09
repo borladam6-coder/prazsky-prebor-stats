@@ -22,18 +22,18 @@ export const STATS: Record<StatKey, StatDef> = {
   pa: { key: 'pa', label: 'PA', title: 'Příchody na pálku', kind: 'count' },
   ab: { key: 'ab', label: 'AB', title: 'Oficiální příchody na pálku (bez BB, HBP, SF, SH)', kind: 'count' },
   h: { key: 'h', label: 'H', title: 'Úspěšné odpaly', kind: 'count' },
-  singles: { key: 'singles', label: '1B', title: 'Jednometové odpaly', kind: 'count' },
-  doubles: { key: 'doubles', label: '2B', title: 'Dvoumetové odpaly', kind: 'count' },
-  triples: { key: 'triples', label: '3B', title: 'Třímetové odpaly', kind: 'count' },
-  hr: { key: 'hr', label: 'HR', title: 'Homeruny', kind: 'count' },
+  singles: { key: 'singles', label: '1B', title: 'Singles', kind: 'count' },
+  doubles: { key: 'doubles', label: '2B', title: 'Doubles', kind: 'count' },
+  triples: { key: 'triples', label: '3B', title: 'Triples', kind: 'count' },
+  hr: { key: 'hr', label: 'HR', title: 'Home runs', kind: 'count' },
   tb: { key: 'tb', label: 'TB', title: 'Celkem met z odpalů', kind: 'count' },
   rbi: { key: 'rbi', label: 'RBI', title: 'Doběhy zajištěné pálkařem', kind: 'count' },
   r: { key: 'r', label: 'R', title: 'Doběhy', kind: 'count' },
-  bb: { key: 'bb', label: 'BB', title: 'Mety za bally', kind: 'count' },
-  k: { key: 'k', label: 'K', title: 'Strikeouty', kind: 'count', lowerIsBetter: true },
-  hbp: { key: 'hbp', label: 'HBP', title: 'Zásahy nadhozem', kind: 'count' },
-  sf: { key: 'sf', label: 'SF', title: 'Obětované odpaly do pole', kind: 'count' },
-  sh: { key: 'sh', label: 'SH', title: 'Obětované bunty', kind: 'count' },
+  bb: { key: 'bb', label: 'BB', title: 'Base on balls', kind: 'count' },
+  k: { key: 'k', label: 'K', title: 'Strikeouts', kind: 'count', lowerIsBetter: true },
+  hbp: { key: 'hbp', label: 'HBP', title: 'Hit by pitch', kind: 'count' },
+  sf: { key: 'sf', label: 'SF', title: 'Sacrifice flies', kind: 'count' },
+  sh: { key: 'sh', label: 'SH', title: 'Sacrifice bunts', kind: 'count' },
   sb: { key: 'sb', label: 'SB', title: 'Ukradené mety', kind: 'count' },
   avg: { key: 'avg', label: 'AVG', title: 'Pálkařský průměr = H / AB', kind: 'rate' },
   obp: { key: 'obp', label: 'OBP', title: 'Procento na metě = (H + BB + HBP) / (AB + BB + HBP + SF)', kind: 'rate' },
@@ -61,19 +61,20 @@ export interface ResultDef {
   group: 'hit' | 'onbase' | 'out';
 }
 
+// Official English scorebook names (the codes are the usual scoring abbreviations).
 export const RESULTS: ResultDef[] = [
-  { code: '1B', label: 'Jednometový', group: 'hit' },
-  { code: '2B', label: 'Dvoumetový', group: 'hit' },
-  { code: '3B', label: 'Třímetový', group: 'hit' },
-  { code: 'HR', label: 'Homerun', group: 'hit' },
-  { code: 'BB', label: 'Meta za bally', group: 'onbase' },
-  { code: 'HBP', label: 'Zásah nadhozem', group: 'onbase' },
+  { code: '1B', label: 'Single', group: 'hit' },
+  { code: '2B', label: 'Double', group: 'hit' },
+  { code: '3B', label: 'Triple', group: 'hit' },
+  { code: 'HR', label: 'Home run', group: 'hit' },
+  { code: 'BB', label: 'Base on balls', group: 'onbase' },
+  { code: 'HBP', label: 'Hit by pitch', group: 'onbase' },
   { code: 'K', label: 'Strikeout', group: 'out' },
-  { code: 'OUT', label: 'Aut v poli', group: 'out' },
-  { code: 'SF', label: 'Obětovaný do pole', group: 'out' },
-  { code: 'SH', label: 'Obětovaný bunt', group: 'out' },
-  { code: 'FC', label: 'Volba polaře', group: 'out' },
-  { code: 'ROE', label: 'Chyba obrany', group: 'out' }
+  { code: 'OUT', label: 'Out', group: 'out' },
+  { code: 'SF', label: 'Sacrifice fly', group: 'out' },
+  { code: 'SH', label: 'Sacrifice bunt', group: 'out' },
+  { code: 'FC', label: "Fielder's choice", group: 'out' },
+  { code: 'ROE', label: 'Reached on error', group: 'out' }
 ];
 
 export const resultDef = (code: string) => RESULTS.find((r) => r.code === code);
