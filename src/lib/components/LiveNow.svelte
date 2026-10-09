@@ -61,7 +61,7 @@
           game={g}
           sessions={sessions.filter((s) => s.game_id === g.id)}
           runs={runs.get(g.id) ?? new Map()}
-          href="/zapasy/{g.id}"
+          href="/zapasy/{g.id}/sledovat"
           cta="Sledovat"
         />
       {/each}

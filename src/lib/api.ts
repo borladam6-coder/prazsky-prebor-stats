@@ -8,6 +8,7 @@ import type {
   PlayerGameLine, PlayerTotals, TeamGameLine, TeamTotals
 } from './types.ts';
 import type { Play } from './live.ts';
+import { buildPlays, type LogEntry, type LogGroup, type PlayItem } from './plays.ts';
 
 export class WriteCancelled extends Error {}
 
@@ -141,6 +142,30 @@ export async function gameRuns(gameId: number): Promise<Map<number, number>> {
   const { data, error } = await db().from('team_game_batting').select('team_id, r').eq('game_id', gameId);
   if (error) throw error;
   return new Map((data ?? []).map((r) => [r.team_id as number, Number(r.r)]));
+}
+
+/** Play-by-play of the live scoring of one game (from the change history). */
+export async function gamePlayLog(gameId: number): Promise<PlayItem[]> {
+  const { data: entries, error } = await db()
+    .from('change_log')
+    .select('id, group_id, table_name, action, old_data, new_data, is_derived')
+    .eq('game_id', gameId)
+    .in('table_name', ['live_sessions', 'plate_appearances', 'game_player_extras'])
+    .order('id')
+    .limit(3000);
+  if (error) throw error;
+  const live = new Set((entries ?? []).filter((e) => e.table_name === 'live_sessions').map((e) => e.group_id as string));
+  const ids = [...live];
+  const groups: LogGroup[] = [];
+  for (let i = 0; i < ids.length; i += 80) {
+    const { data, error: e2 } = await db()
+      .from('change_groups')
+      .select('id, at, action, actor_name, reverted_by_group_id')
+      .in('id', ids.slice(i, i + 80));
+    if (e2) throw e2;
+    groups.push(...((data ?? []) as LogGroup[]));
+  }
+  return buildPlays(groups, ((entries ?? []) as LogEntry[]).filter((e) => live.has(e.group_id)));
 }
 
 export interface HistoryPage {

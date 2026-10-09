@@ -12,6 +12,7 @@
   } from '#lib/api.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
   import { defaultPlay, runsOn, type Base, type Bases, type Play } from '#lib/live.ts';
+  import { battingTeam } from '#lib/plays.ts';
   import { plural, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
   import type { GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance } from '#lib/types.ts';
@@ -125,9 +126,7 @@
   const homeS = $derived(running(game?.home_team_id));
   const awayS = $derived(running(game?.away_team_id));
   const fullGame = $derived(!!homeS && !!awayS);
-  const teamId = $derived(
-    fullGame ? (awayS!.inning <= homeS!.inning ? awayS!.team_id : homeS!.team_id) : chosenId
-  );
+  const teamId = $derived(fullGame ? battingTeam(homeS, awayS) : chosenId);
   const team = $derived(league.team(teamId));
   const half = $derived(fullGame ? (teamId === game?.away_team_id ? 'horní' : 'dolní') : null);
 
@@ -346,7 +345,15 @@
       <p class="empty">Živý zápis se otevře 2 hodiny před začátkem zápasu{game.starts_at ? ` (začátek v ${time(game.starts_at)})` : ''}.</p>
     {:else if !team}
       <!-- ---------------------------------------------------------- team picker -->
-      <p class="lead muted">Za který tým budeš zapisovat? Každý tým si zapisuje své pálkaře.</p>
+      <a class="card watchlink rise" href="/zapasy/{id}/sledovat">
+        <span class="wi"><Icon name="live" size={24} /></span>
+        <span class="tinfo">
+          <span class="tn">Jen sledovat</span>
+          <span class="ts">Skóre, směny, kdo je na pálce a průběh zápasu, bez zapisování</span>
+        </span>
+        <Icon name="chevron" size={20} />
+      </a>
+      <p class="lead muted">Nebo zapisuj: za který tým? Sestavu soupeře můžeš přidat i potom a pálka se po 3 autech bude střídat.</p>
       <div class="pick">
         {#each [home, away] as t, i (t?.id)}
           {#if t}
@@ -663,6 +670,33 @@
   .ts {
     font-size: 14px;
     color: var(--muted);
+  }
+  .watchlink {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    margin-bottom: 22px;
+    text-decoration: none;
+    border-color: color-mix(in srgb, var(--neg) 40%, var(--line));
+    background:
+      radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--neg) 14%, transparent), transparent 60%),
+      var(--surface);
+    transition: transform 160ms, border-color 160ms;
+  }
+  .watchlink:hover {
+    transform: translateY(-2px);
+    border-color: var(--neg);
+  }
+  .wi {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: var(--neg-soft);
+    color: var(--neg);
   }
   .teamline {
     display: flex;
