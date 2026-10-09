@@ -19,6 +19,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 3. U pálkaře na řadě klepni na výsledek. Když jsou mety prázdné, uloží se hned. Když jsou na metách běžci, ukáže se, co se s nimi stalo. Výchozí návrh odpovídá běžnému průběhu, třeba singl posune jen vynucené běžce, takže 4 singly po sobě dají 1 bod. Stačí změnit, co bylo jinak, a dát **Uložit**.
 4. Klepnutím na běžce na diamantu zapíšeš ukradenou metu, postup bez odpalu nebo aut běžce.
 5. **Zpět** vrátí poslední akci. **Pořadí a střídání** a **Opravit stav** řeší náhradníky, náhradní běžce nebo špatně zapsané auty.
+6. **Zapisovat i soupeře** přidá sestavu druhého týmu. Od té chvíle je to normální zápis zápasu: hosté pálí v horní polovině směny (▲), domácí v dolní (▼) a po 3 autech se pálka sama přepne. Zpět pak vrací poslední akci zápasu bez ohledu na tým.
 
 Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny.
 
@@ -27,6 +28,7 @@ Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box
 ```
 supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové funkce, historie, statistiky
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
+supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
 netlify/functions/import-league.mts plánovaný import ze softball.cz
 netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
@@ -42,7 +44,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `supabase/migrations/002_live.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql` a `003_live_undo_game.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

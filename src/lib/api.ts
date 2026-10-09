@@ -273,4 +273,6 @@ export const livePlay = (s: LiveSession, play: Play) =>
     p_rbi: play.result ? play.rbi : null
   });
 
-export const liveUndo = (s: LiveSession) => call<LiveSession>('live_undo', live(s.game_id, s.team_id));
+/** Undo the last play of this team, or with `wholeGame` the last play of the game (both teams scored). */
+export const liveUndo = (s: LiveSession, wholeGame = false) =>
+  call<LiveSession>('live_undo', { p_game_id: s.game_id, p_team_id: wholeGame ? null : s.team_id });

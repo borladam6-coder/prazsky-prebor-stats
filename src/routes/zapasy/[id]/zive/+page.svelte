@@ -26,8 +26,8 @@
   const game = $derived(league.game(id));
   const home = $derived(league.team(game?.home_team_id));
   const away = $derived(league.team(game?.away_team_id));
-  const teamId = $derived(Number(page.url.searchParams.get('tym')) || null);
-  const team = $derived(league.team(teamId));
+  /** team picked in the URL (used while only one team is scored) */
+  const chosenId = $derived(Number(page.url.searchParams.get('tym')) || null);
 
   /** Live scoring opens two hours before the scheduled start (same rule as the database). */
   const open = $derived.by(() => {
@@ -119,6 +119,34 @@
   });
 
   // ------------------------------------------------------------ derived state
+  // Both teams scored on this device → a normal scorebook: the visitors bat in the top
+  // of the inning, the home team in the bottom, and after three outs the bat switches.
+  const running = (tid: number | undefined) => sessions.find((s) => s.team_id === tid && !s.finished);
+  const homeS = $derived(running(game?.home_team_id));
+  const awayS = $derived(running(game?.away_team_id));
+  const fullGame = $derived(!!homeS && !!awayS);
+  const teamId = $derived(
+    fullGame ? (awayS!.inning <= homeS!.inning ? awayS!.team_id : homeS!.team_id) : chosenId
+  );
+  const team = $derived(league.team(teamId));
+  const half = $derived(fullGame ? (teamId === game?.away_team_id ? 'horní' : 'dolní') : null);
+
+  // announce the switch of the batting team
+  let prevBatting: number | null = null;
+  let lastWasUndo = false;
+  $effect(() => {
+    const b = fullGame ? teamId : null;
+    untrack(() => {
+      if (b && prevBatting && b !== prevBatting) {
+        sheet = null;
+        mode = 'score';
+        const name = league.team(b)?.name ?? '';
+        lastPlay = lastWasUndo ? `Akce vrácena, na pálce je znovu ${name}.` : `Konec poloviny směny. Na pálce ${name}.`;
+      }
+      prevBatting = b;
+    });
+  });
+
   const session = $derived(sessions.find((s) => s.team_id === teamId) ?? null);
   const lineup = $derived(lineups.find((l) => l.team_id === teamId)?.players ?? []);
   const bases = $derived<Bases>(session ? [session.runner_1, session.runner_2, session.runner_3] : [null, null, null]);
@@ -201,6 +229,7 @@
   async function submit(play: Play) {
     if (!session) return;
     const name = batter?.name;
+    lastWasUndo = false;
     const ok = await run(
       () => livePlay(session, play),
       () => (lastPlay = describe(play, name))
@@ -221,11 +250,32 @@
   const undo = () => {
     const s = session;
     if (!s) return;
-    run(() => liveUndo(s), () => (lastPlay = 'Poslední akce vrácena.'));
+    lastWasUndo = true;
+    run(() => liveUndo(s, fullGame), () => (lastPlay = 'Poslední akce vrácena.'));
   };
 
+  /**
+   * Inning for a team that joins while the other team is already scored, so that the
+   * visitors bat in the top and the home team in the bottom of the same inning.
+   * A half counts as "in progress" when it has outs or runners; otherwise it just ended.
+   */
+  function joinInning(other: LiveSession, joiningIsHome: boolean): number {
+    const inProgress = other.outs > 0 || !!(other.runner_1 || other.runner_2 || other.runner_3);
+    if (joiningIsHome) return inProgress || other.inning === 1 ? other.inning : other.inning - 1;
+    return inProgress ? other.inning + 1 : other.inning;
+  }
+
   const start = (ids: string[]) =>
-    run(() => liveStart(id, teamId!, ids), () => {
+    run(async () => {
+      const other = running(opponentId);
+      const s = await liveStart(id, teamId!, ids);
+      if (other && game) {
+        const inning = joinInning(other, teamId === game.home_team_id);
+        if (inning !== s.inning) {
+          await liveSetState(s, { inning, outs: 0, bases: [null, null, null], nextSlot: 0 });
+        }
+      }
+    }, () => {
       mode = 'score';
       lastPlay = 'Zápis začal. Hodně štěstí!';
     });
@@ -237,7 +287,11 @@
     });
 
   const finish = (finished: boolean) =>
-    run(() => liveFinish(session!, finished), () => {
+    run(async () => {
+      // with both teams scored here, ending the game ends both sessions
+      const targets = finished && fullGame ? [awayS!, homeS!] : [session!];
+      for (const t of targets) await liveFinish(t, finished);
+    }, () => {
       confirmFinish = false;
       toasts.show(finished ? 'Živý zápis ukončen. Statistiky zůstávají v box score.' : 'Pokračuješ v zápisu.');
     });
@@ -264,6 +318,8 @@
   });
 
   const teamRoster = $derived(teamId ? league.teamPlayers(teamId, true) : []);
+  /** offer to add the opponent's lineup while only one team is scored */
+  const canAddOpponent = $derived(!fullGame && !!session && !session.finished && !!opponentId && !running(opponentId));
   const statusOf = (tid: number | undefined) => sessions.find((s) => s.team_id === tid);
 </script>
 
@@ -315,7 +371,10 @@
         <strong>{team.name}</strong>
         <button type="button" class="btn btn-quiet btn-sm" onclick={() => setTeam(null)}>Změnit tým</button>
       </div>
-      <p class="lead muted">Sestav pořadí pálkařů. Během zápasu ho jde kdykoli upravit (střídání, další hráč).</p>
+      <p class="lead muted">
+        Sestav pořadí pálkařů. Během zápasu ho jde kdykoli upravit (střídání, další hráč).
+        {#if running(opponentId)}Soupeř už se zapisuje, takže po startu se pálka po 3 autech bude sama střídat.{/if}
+      </p>
       <LineupEditor
         teamId={team.id}
         initial={lineup}
@@ -338,6 +397,7 @@
       </div>
     {:else if mode === 'lineup'}
       <!-- ---------------------------------------------------------- lineup edit -->
+      <div class="teamline"><TeamBadge {team} size={30} /><strong>{team.name}</strong></div>
       <LineupEditor
         teamId={team.id}
         initial={lineup}
@@ -350,7 +410,7 @@
     {:else if mode === 'state'}
       <!-- ---------------------------------------------------------- state fix -->
       <section class="card fix" in:fade={{ duration: 150 }}>
-        <h2>Opravit stav</h2>
+        <h2>Opravit stav: {team.short_name ?? team.name}</h2>
         <p class="muted">Pro případy, kdy se něco stalo mimo běžný zápis: náhradní běžec, špatně zapsané auty, přeskočený pálkař.</p>
         <div class="grid">
           <label>
@@ -394,13 +454,24 @@
         <div class="sb">
           <div class="inn">
             <span class="k">Směna</span>
-            <span class="v">{session.inning}.</span>
+            <span class="v">{session.inning}.{#if half}<span class="half" title="{half} polovina">{half === 'horní' ? '▲' : '▼'}</span>{/if}</span>
           </div>
-          <div class="runs">
-            <span class="k"><TeamBadge {team} size={18} /> {team.short_name ?? team.code}</span>
-            <span class="v">{ourRuns}</span>
-          </div>
-          {#if opponentScored}
+          {#if fullGame}
+            {#each [away, home] as t (t?.id)}
+              {#if t}
+                <div class="runs" class:bat={t.id === teamId}>
+                  <span class="k"><TeamBadge team={t} size={18} /> {t.short_name ?? t.code}</span>
+                  <span class="v">{runsOf(t.id)}</span>
+                </div>
+              {/if}
+            {/each}
+          {:else}
+            <div class="runs">
+              <span class="k"><TeamBadge {team} size={18} /> {team.short_name ?? team.code}</span>
+              <span class="v">{ourRuns}</span>
+            </div>
+          {/if}
+          {#if !fullGame && opponentScored}
             <div class="runs opp">
               <span class="k"><TeamBadge team={league.team(opponentId)} size={18} /> {league.team(opponentId)?.short_name ?? ''}</span>
               <span class="v">{runsOf(opponentId)}</span>
@@ -417,11 +488,11 @@
         {/if}
       </section>
 
-      {#key session.next_slot + ':' + session.version}
+      {#key session.team_id + ':' + session.next_slot + ':' + session.version}
         <section class="atbat card" in:fly={{ x: 24, duration: 220 }}>
           <span class="jn" aria-hidden="true">{batter?.jersey_number ?? '–'}</span>
           <span class="info">
-            <span class="k">Na pálce</span>
+            <span class="k">{fullGame ? `Na pálce · ${team.short_name ?? team.name}` : 'Na pálce'}</span>
             <span class="nm">{batter?.name ?? 'Neznámý hráč'}</span>
             <span class="today">{lineOf(batter?.id)}</span>
           </span>
@@ -446,9 +517,14 @@
         </button>
         <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => (mode = 'lineup')}><Icon name="player" size={16} /> Pořadí a střídání</button>
         <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={openFix}><Icon name="tune" size={16} /> Opravit stav</button>
+        {#if canAddOpponent}
+          <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => setTeam(opponentId!)}>
+            <Icon name="plus" size={16} /> Zapisovat i soupeře
+          </button>
+        {/if}
         {#if confirmFinish}
           <span class="confirm">
-            <button type="button" class="btn btn-sm danger" disabled={busy} onclick={() => finish(true)}>Opravdu ukončit</button>
+            <button type="button" class="btn btn-sm danger" disabled={busy} onclick={() => finish(true)}>{fullGame ? 'Ukončit zápis obou týmů' : 'Opravdu ukončit'}</button>
             <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmFinish = false)}>Ne</button>
           </span>
         {:else}
@@ -713,6 +789,15 @@
   }
   .runs.opp .v {
     color: var(--muted);
+  }
+  .runs.bat {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+  .half {
+    font-size: 15px;
+    margin-left: 3px;
+    color: var(--accent-text);
+    vertical-align: 6px;
   }
   .undo {
     margin-left: auto;

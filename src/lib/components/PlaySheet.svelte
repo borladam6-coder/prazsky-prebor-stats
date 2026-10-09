@@ -104,7 +104,7 @@
 
   const name = (id: string | null | undefined) => league.player(id)?.name ?? '?';
   const outsWord = (n: number) => `${n} ${plural(n, ['aut', 'auty', 'autů'])}`;
-  const title = $derived(result ? `${result} – ${resultDef(result)?.label.toLowerCase()}` : 'Pohyb běžců');
+  const title = $derived(result ? `${result} – ${resultDef(result)?.label}` : 'Pohyb běžců');
 
   function submit(e: SubmitEvent) {
     e.preventDefault();

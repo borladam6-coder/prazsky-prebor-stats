@@ -26,7 +26,7 @@ function gameLabel(id: number | null): string | null {
 
 const res = (code: unknown) => {
   const d = resultDef(String(code));
-  return d ? `${d.code} (${d.label.toLowerCase()})` : String(code);
+  return d ? `${d.code} (${d.label})` : String(code);
 };
 
 const teamLabel = (id: unknown) => {
