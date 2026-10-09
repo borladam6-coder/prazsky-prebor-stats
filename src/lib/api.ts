@@ -4,9 +4,10 @@
 import { supabase } from './supabase.ts';
 import { identity } from './identity.svelte.ts';
 import type {
-  ChangeEntry, ChangeGroup, GameExtras, PaResult, PlateAppearance, Player,
+  ChangeEntry, ChangeGroup, GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance, Player,
   PlayerGameLine, PlayerTotals, TeamGameLine, TeamTotals
 } from './types.ts';
+import type { Play } from './live.ts';
 
 export class WriteCancelled extends Error {}
 
@@ -107,6 +108,41 @@ export async function gameEntries(gameId: number): Promise<{ pas: PlateAppearanc
   return { pas: (pas.data ?? []) as PlateAppearance[], extras: (extras.data ?? []) as GameExtras[] };
 }
 
+const LIVE_COLS = 'game_id, team_id, inning, outs, runner_1, runner_2, runner_3, next_slot, finished, started_at, updated_at, version';
+
+/** Live sessions of one game (one per scoring team) with their lineups. */
+export async function liveOfGame(gameId: number): Promise<{ sessions: LiveSession[]; lineups: LiveLineup[] }> {
+  const [s, l] = await Promise.all([
+    db().from('live_sessions').select(LIVE_COLS).eq('game_id', gameId),
+    db().from('live_lineups').select('game_id, team_id, players, version').eq('game_id', gameId)
+  ]);
+  if (s.error) throw s.error;
+  if (l.error) throw l.error;
+  return { sessions: (s.data ?? []) as LiveSession[], lineups: (l.data ?? []) as LiveLineup[] };
+}
+
+/** A session counts as live while it is not finished and had a play in the last 4 hours. */
+export const LIVE_STALE_MS = 4 * 3600_000;
+
+export async function activeLive(): Promise<LiveSession[]> {
+  const since = new Date(Date.now() - LIVE_STALE_MS).toISOString();
+  const { data, error } = await db()
+    .from('live_sessions')
+    .select(LIVE_COLS)
+    .eq('finished', false)
+    .gt('updated_at', since)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as LiveSession[];
+}
+
+/** Runs per team in one game (from the box score). */
+export async function gameRuns(gameId: number): Promise<Map<number, number>> {
+  const { data, error } = await db().from('team_game_batting').select('team_id, r').eq('game_id', gameId);
+  if (error) throw error;
+  return new Map((data ?? []).map((r) => [r.team_id as number, Number(r.r)]));
+}
+
 export interface HistoryPage {
   groups: ChangeGroup[];
   entries: ChangeEntry[];
@@ -196,3 +232,45 @@ export const setPlayerActive = (p: Player, active: boolean) =>
   call<Player>('set_player_active', { p_id: p.id, p_expected_version: p.version, p_active: active });
 
 export const revertGroup = (groupId: string) => call<string>('revert_change_group', { p_group_id: groupId });
+
+// ------------------------------------------------------------------ live scoring
+
+const live = (gameId: number, teamId: number) => ({ p_game_id: gameId, p_team_id: teamId });
+
+export const liveStart = (gameId: number, teamId: number, lineup: string[]) =>
+  call<LiveSession>('live_start', { ...live(gameId, teamId), p_lineup: lineup });
+
+export const liveSetLineup = (s: LiveSession, lineup: string[], nextSlot: number | null = null) =>
+  call<LiveSession>('live_set_lineup', {
+    ...live(s.game_id, s.team_id), p_expected_version: s.version, p_lineup: lineup, p_next_slot: nextSlot
+  });
+
+export const liveSetState = (
+  s: LiveSession,
+  st: { inning: number; outs: number; bases: (string | null)[]; nextSlot: number }
+) =>
+  call<LiveSession>('live_set_state', {
+    ...live(s.game_id, s.team_id),
+    p_expected_version: s.version,
+    p_inning: st.inning,
+    p_outs: st.outs,
+    p_runner_1: st.bases[0],
+    p_runner_2: st.bases[1],
+    p_runner_3: st.bases[2],
+    p_next_slot: st.nextSlot
+  });
+
+export const liveFinish = (s: LiveSession, finished: boolean) =>
+  call<LiveSession>('live_finish', { ...live(s.game_id, s.team_id), p_expected_version: s.version, p_finished: finished });
+
+export const livePlay = (s: LiveSession, play: Play) =>
+  call<LiveSession>('live_play', {
+    ...live(s.game_id, s.team_id),
+    p_expected_version: s.version,
+    p_result: play.result,
+    p_batter_to: play.batterTo,
+    p_runners: play.runners,
+    p_rbi: play.result ? play.rbi : null
+  });
+
+export const liveUndo = (s: LiveSession) => call<LiveSession>('live_undo', live(s.game_id, s.team_id));

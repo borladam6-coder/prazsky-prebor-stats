@@ -10,16 +10,28 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 - Krok 1: databáze, zabezpečení, historie změn a import ze softball.cz.
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
+- Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, auty a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
+
+## Živý zápis
+
+1. V detailu zápasu (nejdřív 2 hodiny před začátkem) klikni **Zapisovat živě** a vyber tým.
+2. Klepáním na hráče ze soupisky sestav pořadí pálkařů a dej **Začít zápis**.
+3. U pálkaře na řadě klepni na výsledek. Když jsou mety prázdné, uloží se hned. Když jsou na metách běžci, ukáže se, co se s nimi stalo. Výchozí návrh odpovídá běžnému průběhu, třeba singl posune jen vynucené běžce, takže 4 singly po sobě dají 1 bod. Stačí změnit, co bylo jinak, a dát **Uložit**.
+4. Klepnutím na běžce na diamantu zapíšeš ukradenou metu, postup bez odpalu nebo aut běžce.
+5. **Zpět** vrátí poslední akci. **Pořadí a střídání** a **Opravit stav** řeší náhradníky, náhradní běžce nebo špatně zapsané auty.
+
+Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny.
 
 ## Struktura
 
 ```
 supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové funkce, historie, statistiky
+supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
 netlify/functions/import-league.mts plánovaný import ze softball.cz
 netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
 src/routes/                        stránky: přehled, zápasy, týmy, hráči, historie
-src/lib/                           data, formátování, komponenty (tabulky, scoreboard, zápis)
+src/lib/                           data, formátování, logika živého zápisu (live.ts), komponenty
 tests/                             automatické testy databáze a importu
 netlify.toml                       nastavení buildu, přesměrování, bezpečnostní hlavičky
 .env.example                       vzor proměnných prostředí
@@ -30,7 +42,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `supabase/migrations/002_live.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`
@@ -84,7 +96,7 @@ V Netlify změň `SEASON_YEAR` (např. na `2027`) a spusť import. Nová sezóna
 npm install
 cp .env.example .env      # doplnit hodnoty
 npm run dev               # web na localhost
-npm test                  # testy databáze a importu (bez připojení k internetu)
+npm test                  # testy databáze, importu a živého zápisu (bez připojení k internetu)
 npm run check             # typová kontrola webu
 npm run check:server      # typová kontrola importu a testů
 ```

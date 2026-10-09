@@ -141,7 +141,7 @@ export interface ChangeGroup {
 export interface ChangeEntry {
   id: number;
   group_id: string;
-  table_name: 'players' | 'plate_appearances' | 'game_player_extras';
+  table_name: 'players' | 'plate_appearances' | 'game_player_extras' | 'live_lineups' | 'live_sessions';
   action: 'insert' | 'update' | 'delete' | 'restore';
   old_data: Record<string, unknown> | null;
   new_data: Record<string, unknown>;
@@ -149,4 +149,27 @@ export interface ChangeEntry {
   game_id: number | null;
   player_id: string | null;
   team_id: number | null;
+}
+
+/** Live scoring state of one team in one game. */
+export interface LiveSession {
+  game_id: number;
+  team_id: number;
+  inning: number;
+  outs: number;
+  runner_1: string | null;
+  runner_2: string | null;
+  runner_3: string | null;
+  next_slot: number;
+  finished: boolean;
+  started_at: string;
+  updated_at: string;
+  version: number;
+}
+
+export interface LiveLineup {
+  game_id: number;
+  team_id: number;
+  players: string[];
+  version: number;
 }
