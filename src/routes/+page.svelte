@@ -1,222 +1,295 @@
 <script lang="ts">
-  // Temporary status page for step 1: verifies the database connection and the import.
-  // It is replaced by the real home page in the next step.
-  import { supabase, configProblem } from '#lib/supabase.ts';
+  import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
+  import { league } from '#lib/league.svelte.ts';
+  import { battingTotals, errorMessage } from '#lib/api.ts';
+  import { LEADER_STATS, STATS, compareStat, type StatKey } from '#lib/stats.ts';
+  import { rate, num } from '#lib/format.ts';
+  import type { PlayerTotals } from '#lib/types.ts';
+  import Scoreboard from '#lib/components/Scoreboard.svelte';
+  import GameRow from '#lib/components/GameRow.svelte';
+  import TeamBadge from '#lib/components/TeamBadge.svelte';
 
-  interface Team {
-    id: number;
-    name: string;
-    code: string;
-    color: string;
-  }
-  interface Status {
-    season: { name: string; year: number; imported_at: string | null } | null;
-    teams: (Team & { players: number })[];
-    games: number;
-    played: number;
-    plateAppearances: number;
-  }
+  let totals = $state<PlayerTotals[] | null>(null);
+  let loadError = $state<string | null>(null);
+  let stat = $state<StatKey>('avg');
+  let minPa = $state(10);
 
-  const problems: Record<string, string> = {
-    missing: 'Chybí proměnné PUBLIC_SUPABASE_URL a PUBLIC_SUPABASE_PUBLISHABLE_KEY v nastavení Netlify.',
-    'bad-url': 'PUBLIC_SUPABASE_URL nemá tvar https://projekt.supabase.co (bez lomítka a cesty na konci).',
-    'secret-key': 'V PUBLIC_SUPABASE_PUBLISHABLE_KEY je tajný klíč (sb_secret_…). Ten do prohlížeče nepatří, použij publishable key.'
-  };
+  onMount(async () => {
+    try {
+      const [t] = await Promise.all([battingTotals(league.season!.id), league.loadRecorded()]);
+      totals = t;
+    } catch (e) {
+      loadError = errorMessage(e);
+    }
+  });
 
-  async function load(): Promise<Status> {
-    if (!supabase) throw new Error(problems[configProblem ?? 'missing']);
-    const { data: season, error: e1 } = await supabase
-      .from('seasons')
-      .select('id, name, year, imported_at')
-      .eq('is_current', true)
-      .maybeSingle();
-    if (e1) throw e1;
-    if (!season) return { season: null, teams: [], games: 0, played: 0, plateAppearances: 0 };
+  const def = $derived(STATS[stat]);
+  const leaders = $derived.by(() => {
+    if (!totals) return [];
+    const pool = def.kind === 'rate' ? totals.filter((t) => t.pa >= minPa) : totals;
+    return pool
+      .filter((t) => t[stat] !== null && Number(t[stat]) > 0)
+      .sort((a, b) => compareStat(a[stat], b[stat], -1))
+      .slice(0, 5);
+  });
+  const hasStats = $derived((totals?.length ?? 0) > 0);
 
-    const [teams, players, games, pas] = await Promise.all([
-      supabase.from('season_teams').select('teams(id, name, code, color)').eq('season_id', season.id),
-      supabase.from('players').select('team_id').eq('season_id', season.id).eq('active', true),
-      supabase.from('games').select('status').eq('season_id', season.id),
-      supabase.from('plate_appearances').select('id', { count: 'exact', head: true }).is('deleted_at', null)
-    ]);
-    for (const r of [teams, players, games, pas]) if (r.error) throw r.error;
-
-    const perTeam = new Map<number, number>();
-    for (const p of players.data ?? []) perTeam.set(p.team_id, (perTeam.get(p.team_id) ?? 0) + 1);
-
-    const teamList = (teams.data ?? [])
-      .map((r) => r.teams as unknown as Team)
-      .filter(Boolean)
-      .map((t) => ({ ...t, players: perTeam.get(t.id) ?? 0 }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-
-    return {
-      season,
-      teams: teamList,
-      games: games.data?.length ?? 0,
-      played: (games.data ?? []).filter((g) => g.status === 'played').length,
-      plateAppearances: pas.count ?? 0
-    };
-  }
-
-  const status = load();
-
-  const fmt = (iso: string | null) =>
-    iso
-      ? new Date(iso).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', dateStyle: 'medium', timeStyle: 'short' })
-      : 'zatím neproběhl';
+  const recent = $derived(league.playedGames.slice(0, 5));
+  const upcoming = $derived(league.upcomingGames.slice(0, 4));
 </script>
 
 <svelte:head>
   <title>Pražský přebor mužů – statistiky</title>
 </svelte:head>
 
-<main>
-  <p class="kicker">Komunitní statistiky</p>
-  <h1>Pražský přebor mužů</h1>
-  <p class="lead">Web se připravuje. Tahle stránka ověřuje propojení s databází a import ze softball.cz.</p>
+<div class="page">
+  <section class="intro">
+    <h1>Pražský přebor mužů</h1>
+    <p>
+      Pálkařské statistiky všech týmů. Zapisuje je kdokoli po zápase, každá změna se ukládá do historie a dá se vrátit.
+    </p>
+  </section>
 
-  {#await status}
-    <p class="muted">Načítám…</p>
-  {:then s}
-    {#if !s.season}
-      <div class="card warn">
-        Databáze je připojená, ale import ještě neproběhl. V Netlify spusť funkci <b>import-league</b> tlačítkem „Run now“.
-      </div>
-    {:else}
-      <div class="card ok">
-        <b>{s.season.name} {s.season.year}</b>
-        <span class="muted">· poslední import: {fmt(s.season.imported_at)}</span>
-      </div>
-      <dl class="stats">
-        <div><dt>Týmy</dt><dd>{s.teams.length}</dd></div>
-        <div><dt>Zápasy</dt><dd>{s.played}<small>/{s.games}</small></dd></div>
-        <div><dt>Hráči</dt><dd>{s.teams.reduce((a, t) => a + t.players, 0)}</dd></div>
-        <div><dt>Zapsané PA</dt><dd>{s.plateAppearances}</dd></div>
-      </dl>
-      <ul class="teams">
-        {#each s.teams as t (t.id)}
-          <li style:--team={t.color}>
-            <span class="dot"></span>
-            <span class="name">{t.name}</span>
-            <span class="muted">{t.code} · {t.players} hráčů</span>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  {:catch err}
-    <div class="card error">
-      <b>Nepodařilo se načíst data.</b><br />
-      {err?.message ?? String(err)}
+  <div class="grid">
+    <div class="col-board">
+      <Scoreboard />
     </div>
-  {/await}
-</main>
+
+    <section class="leaders panel" aria-labelledby="leaders-title">
+      <div class="leaders-head">
+        <h2 id="leaders-title">Nejlepší pálkaři</h2>
+        <a class="all" href="/hraci?sort={stat}">Všichni hráči</a>
+      </div>
+
+      <div class="chips" role="group" aria-label="Statistika">
+        {#each LEADER_STATS as k (k)}
+          <button type="button" class="chip" aria-pressed={stat === k} title={STATS[k].title} onclick={() => (stat = k)}>
+            {STATS[k].label}
+          </button>
+        {/each}
+      </div>
+
+      {#if def.kind === 'rate'}
+        <label class="minpa">
+          <span>Jen hráči s aspoň</span>
+          <input class="input" type="number" min="0" max="200" inputmode="numeric" bind:value={minPa} />
+          <span>PA</span>
+        </label>
+      {/if}
+
+      {#if loadError}
+        <p class="empty">{loadError}</p>
+      {:else if totals === null}
+        <ol class="list" aria-busy="true">
+          {#each Array(5) as _, i (i)}<li class="skeleton"></li>{/each}
+        </ol>
+      {:else if !hasStats}
+        <div class="empty">
+          <p>Zatím nikdo nezapsal žádné statistiky.</p>
+          <a class="btn btn-primary" href="/zapasy">Vybrat zápas a zapsat</a>
+        </div>
+      {:else if leaders.length === 0}
+        <p class="empty">Nikdo nemá aspoň {minPa} PA. Sniž limit.</p>
+      {:else}
+        <ol class="list">
+          {#each leaders as l, i (l.player_id)}
+            {@const p = league.player(l.player_id)}
+            {@const team = league.team(l.team_id)}
+            <li animate:flip={{ duration: 260 }} in:fade={{ duration: 160 }}>
+              <span class="rank">{i + 1}</span>
+              <TeamBadge {team} size={28} />
+              <a class="who" href="/hraci/{l.player_id}">
+                <span class="pname">{p?.name ?? 'Neznámý hráč'}</span>
+                <span class="pteam">{team?.short_name ?? team?.name} · {l.pa} PA</span>
+              </a>
+              <span class="val" class:first={i === 0}>{def.kind === 'rate' ? rate(l[stat]) : num(l[stat])}</span>
+            </li>
+          {/each}
+        </ol>
+      {/if}
+    </section>
+  </div>
+
+  <div class="games">
+    <section class="section" aria-labelledby="recent-title">
+      <div class="section-head">
+        <h2 id="recent-title">Poslední výsledky</h2>
+        <a class="all" href="/zapasy">Všechny zápasy</a>
+      </div>
+      {#if recent.length}
+        <div class="panel list-games">
+          {#each recent as g (g.id)}<GameRow game={g} recorded={league.recorded.get(g.id) ?? 0} />{/each}
+        </div>
+      {:else}
+        <p class="empty">Zatím se nehrálo.</p>
+      {/if}
+    </section>
+
+    <section class="section" aria-labelledby="next-title">
+      <div class="section-head">
+        <h2 id="next-title">Nejbližší zápasy</h2>
+      </div>
+      {#if upcoming.length}
+        <div class="panel list-games">
+          {#each upcoming as g (g.id)}<GameRow game={g} />{/each}
+        </div>
+      {:else}
+        <p class="empty">Žádný další zápas v rozpisu.</p>
+      {/if}
+    </section>
+  </div>
+</div>
 
 <style>
-  main {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 48px 16px 64px;
+  .intro {
+    max-width: 640px;
+    margin: 8px 0 24px;
   }
-  .kicker {
-    margin: 0;
-    color: var(--accent);
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  h1 {
-    margin: 6px 0 8px;
-    font-size: clamp(30px, 7vw, 44px);
-    line-height: 1.05;
-    letter-spacing: -0.02em;
-  }
-  .lead {
-    margin: 0 0 28px;
+  .intro p {
     color: var(--muted);
+    margin: 12px 0 0;
+    font-size: 17px;
   }
-  .muted {
-    color: var(--muted);
-  }
-  .card {
-    padding: 14px 16px;
-    border: 1px solid var(--line);
-    border-left-width: 4px;
-    border-radius: 10px;
-    background: var(--surface);
-    margin-bottom: 16px;
-    line-height: 1.5;
-  }
-  .card.ok {
-    border-left-color: var(--ok);
-  }
-  .card.warn {
-    border-left-color: #ffc53d;
-  }
-  .card.error {
-    border-left-color: var(--danger);
-  }
-  .stats {
+
+  .grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin: 0 0 16px;
+    gap: 20px;
   }
-  .stats div {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px;
+  @media (min-width: 980px) {
+    .grid {
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      align-items: start;
+    }
   }
-  dt {
-    font-size: 12px;
-    color: var(--muted);
+
+  .leaders {
+    padding: 18px;
   }
-  dd {
-    margin: 4px 0 0;
-    font-size: 24px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+  .leaders-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
   }
-  dd small {
+  .all {
     font-size: 14px;
+    font-weight: 600;
     color: var(--muted);
-    font-weight: 500;
+    text-underline-offset: 3px;
   }
-  .teams {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    overflow: hidden;
+  .all:hover {
+    color: var(--ink);
   }
-  .teams li {
+
+  .chips {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin: 14px -18px 0;
+    padding: 2px 18px 4px;
+    scrollbar-width: none;
+  }
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .minpa {
     display: flex;
     align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .minpa .input {
+    width: 72px;
+    min-height: 34px;
+    padding: 4px 8px;
+    text-align: center;
+  }
+
+  .list {
+    list-style: none;
+    margin: 14px 0 0;
+    padding: 0;
+  }
+  .list li {
+    display: grid;
+    grid-template-columns: 22px 28px 1fr auto;
+    align-items: center;
     gap: 10px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--line);
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
   }
-  .teams li:last-child {
-    border-bottom: none;
+  .rank {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--faint);
+    text-align: center;
   }
-  .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--team);
-    flex-shrink: 0;
+  .who {
+    display: grid;
+    min-width: 0;
+    text-decoration: none;
   }
-  .name {
+  .pname {
     font-weight: 600;
-    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  @media (max-width: 520px) {
-    .stats {
-      grid-template-columns: repeat(2, 1fr);
+  .pteam {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .who:hover .pname {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .val {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 26px;
+    line-height: 1;
+  }
+  .val.first {
+    color: var(--amber-ink);
+    font-size: 32px;
+  }
+  .skeleton {
+    height: 49px;
+    background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2));
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+  @keyframes shimmer {
+    to {
+      background-position: -200% 0;
     }
+  }
+  .empty {
+    margin-top: 14px;
+  }
+  .empty p {
+    margin: 0 0 14px;
+  }
+
+  .games {
+    display: grid;
+    gap: 0 20px;
+  }
+  @media (min-width: 980px) {
+    .games {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .list-games {
+    overflow: hidden;
+  }
+  .list-games :global(.row:last-child) {
+    border-bottom: none;
   }
 </style>

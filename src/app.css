@@ -1,0 +1,307 @@
+/* Global styles and design tokens.
+   Visual idea: a ballpark scoreboard. Deep "board green" panels with chalk and
+   bulb-amber numerals carry the identity; everything else stays quiet so the
+   numbers are the loudest thing on the page. */
+
+@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource-variable/big-shoulders-display/index.css';
+
+:root {
+  --font-display: 'Big Shoulders Display Variable', 'Arial Narrow', sans-serif;
+  --font-body: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* light: scorebook paper */
+  --bg: #eef1ec;
+  --surface: #ffffff;
+  --surface-2: #f5f7f3;
+  --ink: #10241b;
+  --muted: #56685e;
+  --faint: #8b9a91;
+  --line: #d6ddd5;
+  --line-strong: #b9c4bb;
+
+  --board: #17352a;
+  --board-2: #1e4335;
+  --board-slot: #0f261d;
+  --board-ink: #e9efe6;
+  --board-muted: #9db4a6;
+
+  --amber: #f2b705;
+  --amber-ink: #8a5f00;
+  --red: #c8322b;
+  --ok: #2c8a57;
+
+  --focus: #f2b705;
+  --shadow: 0 1px 0 rgb(16 36 27 / 0.06), 0 8px 24px -16px rgb(16 36 27 / 0.35);
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+
+  --gutter: 16px;
+  --max: 1160px;
+  --nav-h: 64px;
+
+  color-scheme: light;
+}
+
+/* dark: night game under the lights */
+:root[data-theme='dark'] {
+  --bg: #0b1611;
+  --surface: #12211a;
+  --surface-2: #172a21;
+  --ink: #e7eee8;
+  --muted: #95a89c;
+  --faint: #6a7d71;
+  --line: #22362b;
+  --line-strong: #31493c;
+
+  --board: #0f2a1f;
+  --board-2: #143527;
+  --board-slot: #081a12;
+  --board-ink: #eef3ec;
+  --board-muted: #8fa99a;
+
+  --amber: #f5bd1f;
+  --amber-ink: #f5bd1f;
+  --red: #ef5b52;
+  --ok: #4cc283;
+  --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 10px 30px -18px rgb(0 0 0 / 0.8);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b1611;
+    --surface: #12211a;
+    --surface-2: #172a21;
+    --ink: #e7eee8;
+    --muted: #95a89c;
+    --faint: #6a7d71;
+    --line: #22362b;
+    --line-strong: #31493c;
+
+    --board: #0f2a1f;
+    --board-2: #143527;
+    --board-slot: #081a12;
+    --board-ink: #eef3ec;
+    --board-muted: #8fa99a;
+
+    --amber: #f5bd1f;
+    --amber-ink: #f5bd1f;
+    --red: #ef5b52;
+    --ok: #4cc283;
+    --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 10px 30px -18px rgb(0 0 0 / 0.8);
+
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(36px, 9vw, 64px);
+}
+h2 {
+  font-size: clamp(26px, 5vw, 34px);
+}
+h3 {
+  font-size: 22px;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ layout helpers */
+.page {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 20px var(--gutter) 40px;
+}
+
+.section {
+  margin-top: 36px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------ controls */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms, transform 80ms;
+}
+.btn:hover {
+  border-color: var(--ink);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+.btn-primary {
+  background: var(--board);
+  border-color: var(--board);
+  color: var(--board-ink);
+}
+.btn-primary:hover {
+  background: var(--board-2);
+  border-color: var(--board-2);
+}
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.btn-quiet:hover {
+  color: var(--ink);
+  border-color: var(--line);
+}
+.btn-danger {
+  color: var(--red);
+}
+
+.input,
+.select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+}
+.input:focus,
+.select:focus {
+  border-color: var(--ink);
+  outline: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+}
+
+.empty {
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+}
+
+.rate {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
