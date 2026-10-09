@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createDb, expectError, CONSISTENCY, type Caller, type Row } from './harness.ts';
 import { defaultPlay, validatePlay, applyPlay, occupied, type Bases, type LiveState, type Play } from '../src/lib/live.ts';
 import type { PaResult } from '../src/lib/types.ts';
+import { buildPlays, lineScore, byHalfInning, battingTeam } from '../src/lib/plays.ts';
 
 let t: Awaited<ReturnType<typeof createDb>>;
 let c: Caller;
@@ -396,4 +397,29 @@ test('both teams on one device: undo without a team reverts the latest play of t
   assert.equal(s.outs, 1);
   assert.ok((await sess(g2.home_team_id)).runner_1, 'home runner untouched');
   assert.deepEqual(await t.as('anon', CONSISTENCY), []);
+});
+
+test('play-by-play rebuilt from the history matches the box score', async () => {
+  for (const g of await t.q(`select distinct game_id from live_sessions`)) {
+    const entries = await t.as('anon', `select id, group_id, table_name, action, old_data, new_data, is_derived
+      from change_log where game_id = $1 and table_name in ('live_sessions','plate_appearances','game_player_extras') order by id`, [g.game_id]);
+    const ids = [...new Set(entries.filter((e) => e.table_name === 'live_sessions').map((e) => e.group_id))];
+    const groups = await t.as('anon', `select id, at::text, action, actor_name, reverted_by_group_id from change_groups where id = any($1::uuid[])`, [ids]);
+    const plays = buildPlays(groups as any, entries.filter((e) => ids.includes(e.group_id)) as any);
+    const line = lineScore(plays);
+
+    const box = await t.q(`select team_id, sum(r)::int r, sum(pa)::int pa from player_game_batting where game_id = $1 group by team_id`, [g.game_id]);
+    for (const b of box) {
+      const fromPlays = (line.get(b.team_id) ?? []).reduce((a, x) => a + x, 0);
+      assert.equal(fromPlays, b.r, `runs of team ${b.team_id} in game ${g.game_id}`);
+      assert.equal(plays.filter((p) => p.teamId === b.team_id && p.result).length, b.pa, 'one play per plate appearance');
+    }
+    // half-innings: newest first, every half belongs to one team and inning
+    const halves = byHalfInning(plays);
+    assert.equal(halves.reduce((a, h) => a + h.plays.length, 0), plays.length);
+    for (const h of halves) assert.ok(h.plays.every((p) => p.teamId === h.teamId && p.inning === h.inning));
+  }
+  assert.equal(battingTeam({ team_id: 1, inning: 3 }, { team_id: 2, inning: 3 }), 2, 'visitors bat first in an inning');
+  assert.equal(battingTeam({ team_id: 1, inning: 3 }, { team_id: 2, inning: 4 }), 1, 'home bats in the bottom');
+  assert.equal(battingTeam({ team_id: 1, inning: 2 }, undefined), 1);
 });

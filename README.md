@@ -21,6 +21,8 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 5. **Zpět** vrátí poslední akci. **Pořadí a střídání** a **Opravit stav** řeší náhradníky, náhradní běžce nebo špatně zapsané auty.
 6. **Zapisovat i soupeře** přidá sestavu druhého týmu. Od té chvíle je to normální zápis zápasu: hosté pálí v horní polovině směny (▲), domácí v dolní (▼) a po 3 autech se pálka sama přepne. Zpět pak vrací poslední akci zápasu bez ohledu na tým.
 
+**Sledovat** (z přehledu, detailu zápasu nebo výběru na stránce živého zápisu) otevře pohled jen pro diváky: skóre, směna a auty, diamant s běžci, kdo je na pálce, skóre po směnách, průběh zápasu po polovinách směn a sestavy s dnešními výsledky. Aktualizuje se sám.
+
 Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny.
 
 ## Struktura

@@ -248,12 +248,14 @@
 
     {#if activeLive.length}
       <div class="livebox">
-        <LiveCard {game} sessions={activeLive} runs={runsByTeam} href="/zapasy/{id}/zive" cta="Zapisovat živě" />
+        <LiveCard {game} sessions={activeLive} runs={runsByTeam} href="/zapasy/{id}/sledovat" cta="Sledovat živě" />
+        <a class="btn btn-dark btn-sm" href="/zapasy/{id}/zive"><Icon name="pencil" size={16} /> Zapisovat</a>
       </div>
     {:else if liveOpen}
       <div class="livebar">
         <a class="btn btn-primary" href="/zapasy/{id}/zive"><Icon name="live" size={18} /> Zapisovat živě</a>
-        <span class="muted">Sestavíš pořadí pálkařů a zapisuješ pálkaře po pálkaři, doběhy se dopočítají samy.</span>
+        <a class="btn btn-dark" href="/zapasy/{id}/sledovat">Sledovat</a>
+        <span class="muted">Zapisuješ pálkaře po pálkaři, doběhy se dopočítají samy. Ostatní můžou zápas sledovat živě.</span>
       </div>
     {/if}
 
@@ -496,7 +498,13 @@
 
   /* ---------- live */
   .livebox {
+    display: grid;
+    gap: 8px;
+    justify-items: end;
     margin-top: 14px;
+  }
+  .livebox > :global(.live) {
+    width: 100%;
   }
   .livebar {
     display: flex;

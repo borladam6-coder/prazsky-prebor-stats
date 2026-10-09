@@ -6,7 +6,6 @@
   import { battingTotals, errorMessage } from '#lib/api.ts';
   import { LEADER_STATS, STATS, compareStat, type StatKey } from '#lib/stats.ts';
   import { rate, num, plural } from '#lib/format.ts';
-  import { countUp, czNumber } from '#lib/motion.ts';
   import type { PlayerTotals } from '#lib/types.ts';
   import Standings from '#lib/components/Standings.svelte';
   import GameCard from '#lib/components/GameCard.svelte';
@@ -34,9 +33,6 @@
   const leaderTeam = $derived(league.team(leader?.team_id));
   const lead = $derived(leader ? leader.points - Math.max(0, ...table.slice(1).map((s) => s.points)) : 0);
 
-  const played = $derived(league.games.filter((g) => g.home_score !== null && g.away_score !== null));
-  const totalRuns = $derived(played.reduce((a, g) => a + g.home_score! + g.away_score!, 0));
-  const runsPerGame = $derived(played.length ? totalRuns / played.length : 0);
   const seasonRunning = $derived(league.upcomingGames.length > 0);
 
   // ---------------------------------------------------------------- leaders
@@ -117,14 +113,6 @@
         <span class="ring" aria-hidden="true"></span>
       </a>
     {/if}
-    <div class="card kpi rise" style:--i="3">
-      <span class="muted small">Odehrané zápasy</span>
-      <span class="big"><span use:countUp={{ value: played.length }}></span><small>z {league.games.length}, {league.teams.length} týmů</small></span>
-    </div>
-    <div class="card kpi rise" style:--i="4">
-      <span class="muted small" title="Průměrný součet bodů (doběhů) obou týmů v jednom zápase">Bodů na zápas</span>
-      <span class="big"><span use:countUp={{ value: runsPerGame, decimals: 1 }}></span><small>{czNumber(totalRuns)} celkem</small></span>
-    </div>
   </section>
 
   <div class="grid">
@@ -289,12 +277,7 @@
   .kpis {
     display: grid;
     gap: 14px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-  @media (min-width: 900px) {
-    .kpis {
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-    }
+    grid-template-columns: minmax(0, 1fr);
   }
   .kpi {
     position: relative;
@@ -317,22 +300,6 @@
   .small {
     font-size: 13.5px;
   }
-  .big {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px 10px;
-  }
-  .big > span {
-    font-size: clamp(40px, 7vw, 56px);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1;
-  }
-  .big small {
-    font-size: 14px;
-    color: var(--muted);
-  }
 
   .leader {
     grid-column: 1 / -1;
@@ -343,11 +310,6 @@
   }
   .leader:hover {
     border-color: var(--line-strong);
-  }
-  @media (min-width: 900px) {
-    .leader {
-      grid-column: auto;
-    }
   }
   .kpi-top {
     display: flex;
