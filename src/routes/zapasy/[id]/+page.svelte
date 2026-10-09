@@ -6,13 +6,14 @@
   import { supabase } from '#lib/supabase.ts';
   import {
     gameLines, gameEntries, addPlateAppearance, updatePlateAppearance, deletePlateAppearance,
-    bumpStat, addPlayer, errorMessage, WriteCancelled
+    bumpStat, addPlayer, errorMessage, WriteCancelled, liveOfGame, LIVE_STALE_MS
   } from '#lib/api.ts';
   import { statColumns } from '#lib/columns.ts';
   import { BOX_STATS, RESULTS, resultDef } from '#lib/stats.ts';
   import { longDate, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
-  import type { GameExtras, PaResult, PlateAppearance, Player, PlayerGameLine, Team } from '#lib/types.ts';
+  import type { GameExtras, LiveSession, PaResult, PlateAppearance, Player, PlayerGameLine, Team } from '#lib/types.ts';
+  import LiveCard from '#lib/components/LiveCard.svelte';
   import StatTable from '#lib/components/StatTable.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import HistoryList from '#lib/components/HistoryList.svelte';
@@ -23,6 +24,23 @@
   const home = $derived(league.team(game?.home_team_id));
   const away = $derived(league.team(game?.away_team_id));
   const playable = $derived(game ? league.isPlayable(game) : false);
+  /** live scoring opens 2 h before the scheduled start */
+  const liveOpen = $derived(
+    !!game && game.status !== 'cancelled' && game.status !== 'canceled' &&
+      (game.status === 'played' || (!!game.starts_at && new Date(game.starts_at).getTime() <= Date.now() + 2 * 3600_000))
+  );
+  let live = $state<LiveSession[]>([]);
+  const activeLive = $derived(
+    live.filter((s) => !s.finished && Date.now() - new Date(s.updated_at).getTime() < LIVE_STALE_MS)
+  );
+  const runsByTeam = $derived(
+    new Map(
+      [home, away]
+        .filter((t): t is Team => !!t)
+        .filter((t) => lines.some((l) => l.team_id === t.id))
+        .map((t) => [t.id, lines.filter((l) => l.team_id === t.id).reduce((a, l) => a + Number(l.r), 0)])
+    )
+  );
 
   let lines = $state<PlayerGameLine[]>([]);
   let pas = $state<PlateAppearance[]>([]);
@@ -38,10 +56,16 @@
 
   async function load() {
     try {
-      const [l, e] = await Promise.all([gameLines(id), gameEntries(id)]);
+      const [l, e, lv] = await Promise.all([
+        gameLines(id),
+        gameEntries(id),
+        // live scoring is optional for this page (e.g. before migration 002 is applied)
+        liveOfGame(id).catch(() => ({ sessions: [] as LiveSession[], lineups: [] }))
+      ]);
       lines = l;
       pas = e.pas;
       extras = e.extras;
+      live = lv.sessions;
       loadError = null;
     } catch (e) {
       loadError = errorMessage(e);
@@ -58,6 +82,7 @@
       lines = [];
       pas = [];
       extras = [];
+      live = [];
       openPlayer = null;
       entryTeamId = league.game(gameId)?.home_team_id ?? null;
       load();
@@ -76,6 +101,7 @@
       .channel(`game-${gameId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plate_appearances', filter: `game_id=eq.${gameId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_player_extras', filter: `game_id=eq.${gameId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_sessions', filter: `game_id=eq.${gameId}` }, refresh)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -219,6 +245,17 @@
         {longDate(game.starts_at)}{game.starts_at ? `, ${time(game.starts_at)}` : ''}{game.venue ? `, ${game.venue}` : ''}
       </p>
     </section>
+
+    {#if activeLive.length}
+      <div class="livebox">
+        <LiveCard {game} sessions={activeLive} runs={runsByTeam} href="/zapasy/{id}/zive" cta="Zapisovat živě" />
+      </div>
+    {:else if liveOpen}
+      <div class="livebar">
+        <a class="btn btn-primary" href="/zapasy/{id}/zive"><Icon name="live" size={18} /> Zapisovat živě</a>
+        <span class="muted">Sestavíš pořadí pálkařů a zapisuješ pálkaře po pálkaři, doběhy se dopočítají samy.</span>
+      </div>
+    {/if}
 
     <div class="seg tabs" role="tablist" aria-label="Části zápasu">
       <button type="button" role="tab" aria-selected={tab === 'box'} onclick={() => (tab = 'box')}>Box score</button>
@@ -455,6 +492,19 @@
     text-align: center;
     font-size: 14px;
     color: var(--muted);
+  }
+
+  /* ---------- live */
+  .livebox {
+    margin-top: 14px;
+  }
+  .livebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-top: 14px;
+    font-size: 14px;
   }
 
   /* ---------- tabs */

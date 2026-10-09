@@ -2,7 +2,8 @@
   // Small stroke icon set (24×24 grid), drawn for this site.
   type Name =
     | 'board' | 'calendar' | 'shield' | 'player' | 'history' | 'sun' | 'moon' | 'auto'
-    | 'chevron' | 'back' | 'plus' | 'minus' | 'undo' | 'pencil' | 'close' | 'check' | 'search' | 'trash';
+    | 'chevron' | 'back' | 'plus' | 'minus' | 'undo' | 'pencil' | 'close' | 'check' | 'search' | 'trash'
+    | 'live' | 'up' | 'down' | 'swap' | 'flag' | 'tune';
 
   let { name, size = 20 }: { name: Name; size?: number } = $props();
 </script>
@@ -44,5 +45,17 @@
     <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
   {:else if name === 'trash'}
     <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" />
+  {:else if name === 'live'}
+    <circle cx="12" cy="12" r="2.5" fill="currentColor" /><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" />
+  {:else if name === 'up'}
+    <path d="M6 15l6-6 6 6" />
+  {:else if name === 'down'}
+    <path d="M6 9l6 6 6-6" />
+  {:else if name === 'swap'}
+    <path d="M7 4L4 7l3 3M4 7h12M17 20l3-3-3-3M20 17H8" />
+  {:else if name === 'flag'}
+    <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+  {:else if name === 'tune'}
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" />
   {/if}
 </svg>

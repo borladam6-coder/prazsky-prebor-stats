@@ -4,14 +4,12 @@
 
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { PGlite, type Transaction } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import { fetchSeason } from '../netlify/lib/softball-api.ts';
 import { buildApi, LEAGUE_ID, YEAR, SEASON_ID, rosterId } from './fixture.ts';
 
-const MIGRATION = readFileSync(new URL('../supabase/migrations/001_init.sql', import.meta.url), 'utf8');
-const CONSISTENCY = readFileSync(new URL('../supabase/tests/consistency.sql', import.meta.url), 'utf8');
+import { MIGRATIONS, CONSISTENCY } from './harness.ts';
 
 let db: PGlite;
 let ipCounter = 0;
@@ -90,7 +88,7 @@ before(async () => {
     create role service_role nologin bypassrls;
     grant usage on schema public to anon, authenticated, service_role;
   `);
-  await db.exec(MIGRATION);
+  for (const m of MIGRATIONS) await db.exec(m);
 });
 
 // ----------------------------------------------------------------- import

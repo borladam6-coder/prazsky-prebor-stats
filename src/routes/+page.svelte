@@ -12,6 +12,7 @@
   import GameCard from '#lib/components/GameCard.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Icon from '#lib/components/Icon.svelte';
+  import LiveNow from '#lib/components/LiveNow.svelte';
 
   let totals = $state<PlayerTotals[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -51,6 +52,14 @@
 
   const recent = $derived(league.playedGames.slice(0, 4));
   const upcoming = $derived(league.upcomingGames.slice(0, 6));
+  // a game that can be scored live right now (2 h before until 4 h after the scheduled start)
+  const liveCandidate = $derived(
+    league.games.find((g) => {
+      if (!g.starts_at || g.status === 'cancelled' || g.status === 'canceled') return false;
+      const t = new Date(g.starts_at).getTime() - Date.now();
+      return t <= 2 * 3600_000 && t >= -4 * 3600_000;
+    })
+  );
   const firstToRecord = $derived(league.playedGames.find((g) => (league.recorded.get(g.id) ?? 0) < 2) ?? league.playedGames[0]);
 </script>
 
@@ -67,16 +76,24 @@
       </span>
       <h1 class="rise" style:--i="1">{league.season?.name ?? 'Pražský přebor mužů'}</h1>
       <p class="rise" style:--i="2">
-        Pálkařské statistiky všech týmů. Zapisuje je kdokoli po zápase, každá změna se ukládá do historie a dá se vrátit.
+        Pálkařské statistiky všech týmů. Zapisuje je kdokoli, živě během zápasu nebo po něm. Každá změna se ukládá do historie a dá se vrátit.
       </p>
     </div>
     <div class="hero-actions rise" style:--i="3">
       <a class="btn btn-dark" href="/zapasy?stav=nadchazejici">Rozpis zápasů</a>
-      <a class="btn btn-primary" href={firstToRecord ? `/zapasy/${firstToRecord.id}?zapis` : '/zapasy'}>
-        <Icon name="plus" size={18} /> Zapsat statistiky
-      </a>
+      {#if liveCandidate}
+        <a class="btn btn-primary" href="/zapasy/{liveCandidate.id}/zive">
+          <Icon name="live" size={18} /> Zapisovat živě
+        </a>
+      {:else}
+        <a class="btn btn-primary" href={firstToRecord ? `/zapasy/${firstToRecord.id}?zapis` : '/zapasy'}>
+          <Icon name="plus" size={18} /> Zapsat statistiky
+        </a>
+      {/if}
     </div>
   </section>
+
+  <LiveNow />
 
   <section class="kpis" aria-label="Sezóna v číslech">
     {#if leader && leaderTeam}
