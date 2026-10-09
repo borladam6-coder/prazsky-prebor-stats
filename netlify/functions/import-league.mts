@@ -43,7 +43,8 @@ function describeUrl(url: string): string {
 export default async (): Promise<Response> => {
   const started = Date.now();
   const url = env('SUPABASE_URL');
-  const key = env('SUPABASE_SECRET_KEY');
+  // API keys never contain whitespace; pasted values sometimes get a line break inside.
+  const key = env('SUPABASE_SECRET_KEY')?.replace(/\s+/g, '');
   const leagueId = Number(env('LEAGUE_ID') ?? 13);
   const year = Number(env('SEASON_YEAR') ?? 2026);
 
