@@ -19,6 +19,27 @@ function env(name: string): string | undefined {
   return value && value.trim() !== '' ? value.trim() : undefined;
 }
 
+// Describes the shape of a key for troubleshooting without ever logging the key itself.
+function describeKey(key: string): string {
+  const kind = key.startsWith('sb_secret_')
+    ? 'secret key'
+    : key.startsWith('sb_publishable_')
+      ? 'PUBLISHABLE key (wrong – the secret key is needed)'
+      : key.startsWith('eyJ')
+        ? 'legacy JWT key'
+        : 'unknown format';
+  const issues = [
+    /\s/.test(key) ? 'contains whitespace or line breaks' : null,
+    /^["']|["']$/.test(key) ? 'wrapped in quotes' : null
+  ].filter(Boolean);
+  return `${kind}, ${key.length} characters${issues.length ? ', ' + issues.join(', ') : ''}`;
+}
+
+// Supabase project URL must be the bare origin, e.g. https://abcd.supabase.co
+function describeUrl(url: string): string {
+  return /^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(url) ? 'looks valid' : 'unexpected format';
+}
+
 export default async (): Promise<Response> => {
   const started = Date.now();
   const url = env('SUPABASE_URL');
@@ -43,7 +64,12 @@ export default async (): Promise<Response> => {
       auth: { persistSession: false, autoRefreshToken: false }
     });
     const { data, error } = await supabase.rpc('import_season', { p_payload: payload });
-    if (error) throw new Error(`Supabase: ${error.message}`);
+    if (error) {
+      if (/api key/i.test(error.message)) {
+        console.error(`import-league: SUPABASE_SECRET_KEY: ${describeKey(key)}; SUPABASE_URL: ${describeUrl(url)}`);
+      }
+      throw new Error(`Supabase: ${error.message}`);
+    }
 
     const summary = { ...((data as Record<string, unknown>) ?? {}), warnings: warnings.length, ms: Date.now() - started };
     console.log('import-league: done', JSON.stringify(summary));
