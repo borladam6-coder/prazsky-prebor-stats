@@ -25,7 +25,7 @@
       <tr>
         <th scope="col" class="pos">#</th>
         <th scope="col" class="team">Tým</th>
-        <th scope="col" title="Zápasy">Z</th>
+        <th scope="col" class="games" title="Zápasy">Z</th>
         <th scope="col" title="Výhry">V</th>
         <th scope="col" title="Prohry">P</th>
         <th scope="col" class="share" title="Podíl výher">Úspěšnost</th>
@@ -46,7 +46,7 @@
               <span class="short">{team?.short_name ?? team?.code}</span>
             </a>
           </th>
-          <td class="dim">{s.games}</td>
+          <td class="dim games">{s.games}</td>
           <td class="strong">{s.wins}</td>
           <td class="dim">{s.losses}</td>
           <td class="share">
@@ -143,7 +143,10 @@
     white-space: nowrap;
   }
   .short {
-    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .dim {
     color: var(--muted);
@@ -230,13 +233,53 @@
       display: table-cell;
     }
   }
-  @media (max-width: 400px) {
+  /* phones: fixed column widths so long team names truncate instead of wrapping */
+  @media (max-width: 639px) {
+    .standings {
+      padding: 16px 6px 8px;
+    }
+    header {
+      padding: 0 10px 10px;
+    }
+    table {
+      table-layout: fixed;
+      font-size: 14.5px;
+    }
     td,
     th {
-      padding: 10px 4px;
+      padding: 9px 3px;
+    }
+    .pos {
+      width: 26px;
+      padding-left: 8px;
+    }
+    thead th:nth-child(4),
+    thead th:nth-child(5) {
+      width: 28px;
+    }
+    thead th:nth-child(8) {
+      width: 54px;
+    }
+    .pts,
+    thead th.pts {
+      width: 40px;
+      padding-right: 8px;
+    }
+    .games {
+      display: none;
+    }
+    .team {
+      width: auto;
     }
     .team a {
-      gap: 8px;
+      gap: 9px;
+    }
+    .pill {
+      padding: 3px 7px;
+      font-size: 12px;
+    }
+    .pts {
+      font-size: 16px;
     }
   }
 </style>

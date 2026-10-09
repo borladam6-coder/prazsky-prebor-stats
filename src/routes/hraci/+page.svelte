@@ -6,6 +6,7 @@
   import { statColumns } from '#lib/columns.ts';
   import { STATS, TABLE_STATS, type StatKey } from '#lib/stats.ts';
   import type { PlayerTotals } from '#lib/types.ts';
+  import { plural } from '#lib/format.ts';
   import StatTable from '#lib/components/StatTable.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Filters from '#lib/components/Filters.svelte';
@@ -53,7 +54,7 @@
 <div class="page">
   <h1>Hráči</h1>
   <p class="lead muted">
-    Pálkařské statistiky všech hráčů ligy. Řaď klepnutím na záhlaví sloupce, podrž ukazatel nad zkratkou pro vysvětlení.
+    Pálkařské statistiky všech hráčů ligy. Řaď klepnutím na záhlaví sloupce.
   </p>
 
   <Filters bind:teamId bind:from bind:to bind:minPa onchange={load} />
@@ -69,7 +70,7 @@
   {:else if rows === null}
     <p class="muted">Načítám…</p>
   {:else}
-    <p class="count muted">{shown.length} hráčů</p>
+    <p class="count muted">{shown.length} {plural(shown.length, ['hráč', 'hráči', 'hráčů'])}</p>
     <StatTable
       rows={shown}
       rowKey={(r) => r.player_id}
