@@ -3,8 +3,8 @@
    bulb-amber numerals carry the identity; everything else stays quiet so the
    numbers are the loudest thing on the page. */
 
-@import '@fontsource-variable/archivo/wdth.css';
-@import '@fontsource-variable/big-shoulders-display/index.css';
+@import '@fontsource-variable/archivo/wdth';
+@import '@fontsource-variable/big-shoulders-display';
 
 :root {
   --font-display: 'Big Shoulders Display Variable', 'Arial Narrow', sans-serif;
