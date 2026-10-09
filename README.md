@@ -51,7 +51,7 @@ Vytvoř prázdný repozitář (např. `prazsky-prebor-stats`) a nahraj do něj t
 | `SUPABASE_SECRET_KEY` | Secret key |
 | `SEASON_YEAR` | `2026` |
 
-   Pokud Netlify nabídne volbu „Contains secret values“, zaškrtni ji **jen** u `SUPABASE_SECRET_KEY`. U URL ne, protože je veřejně vidět v kódu webu a Netlify by build zastavil.
+   Volbu „Contains secret values“ zaškrtni **jen** u `SUPABASE_SECRET_KEY`. Při importu z .env platí pro všechny vkládané proměnné najednou, proto secret key přidej zvlášť (Add a single variable). Kdyby byly jako tajné označené i ostatní, Netlify najde jejich hodnoty v kódu webu a build zastaví.
 
 3. Spusť **Deploy**.
 4. Po deployi otevři v Netlify sekci **Functions → import-league** a klikni **Run now**. Tím proběhne první import, další už běží samy každých 6 hodin.
