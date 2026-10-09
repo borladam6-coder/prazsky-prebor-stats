@@ -155,6 +155,7 @@
 
   .grid {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 20px;
   }
   @media (min-width: 980px) {
@@ -279,6 +280,7 @@
 
   .games {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0 20px;
   }
   @media (min-width: 980px) {

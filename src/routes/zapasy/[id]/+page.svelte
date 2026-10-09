@@ -10,7 +10,7 @@
   } from '#lib/api.ts';
   import { statColumns } from '#lib/columns.ts';
   import { BOX_STATS, RESULTS, resultDef } from '#lib/stats.ts';
-  import { day, time, date } from '#lib/format.ts';
+  import { longDate, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
   import type { GameExtras, PaResult, PlateAppearance, Player, PlayerGameLine, Team } from '#lib/types.ts';
   import StatTable from '#lib/components/StatTable.svelte';
@@ -199,7 +199,7 @@
   {:else}
     <section class="head" aria-label="Výsledek zápasu">
       <div class="side">
-        <TeamBadge team={home} size={44} />
+        <TeamBadge team={home} size={44} eager />
         <a class="tname" href="/tymy/{home?.id}">{home?.name}</a>
         <span class="role">domácí</span>
       </div>
@@ -211,12 +211,12 @@
         {/if}
       </div>
       <div class="side right">
-        <TeamBadge team={away} size={44} />
+        <TeamBadge team={away} size={44} eager />
         <a class="tname" href="/tymy/{away?.id}">{away?.name}</a>
         <span class="role">hosté</span>
       </div>
       <p class="info">
-        {day(game.starts_at)} {date(game.starts_at)}{game.starts_at ? `, ${time(game.starts_at)}` : ''}{game.venue ? `, ${game.venue}` : ''}
+        {longDate(game.starts_at)}{game.starts_at ? `, ${time(game.starts_at)}` : ''}{game.venue ? `, ${game.venue}` : ''}
       </p>
     </section>
 

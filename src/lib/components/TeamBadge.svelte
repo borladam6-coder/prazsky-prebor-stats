@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Team } from '../types.ts';
 
-  let { team, size = 32 }: { team: Team | undefined; size?: number } = $props();
+  let { team, size = 32, eager = false }: { team: Team | undefined; size?: number; eager?: boolean } = $props();
 
   // Logos are hosted by the association. If one fails to load, fall back to the team code.
   let failed = $state(false);
@@ -19,7 +19,7 @@
       alt=""
       width={size}
       height={size}
-      loading="lazy"
+      loading={eager ? 'eager' : 'lazy'}
       decoding="async"
       referrerpolicy="no-referrer"
       onerror={() => (failed = true)}

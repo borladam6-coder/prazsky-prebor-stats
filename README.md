@@ -8,7 +8,8 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 ## Stav
 
-Krok 1 je hotový: databáze, zabezpečení, historie změn a import. Web zatím ukazuje jen kontrolní stránku, která ověřuje připojení a import. Plný web přijde v dalším kroku.
+- Krok 1: databáze, zabezpečení, historie změn a import ze softball.cz.
+- Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 
 ## Struktura
 
@@ -17,7 +18,8 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
 netlify/functions/import-league.mts plánovaný import ze softball.cz
 netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
-src/                               web (SvelteKit)
+src/routes/                        stránky: přehled, zápasy, týmy, hráči, historie
+src/lib/                           data, formátování, komponenty (tabulky, scoreboard, zápis)
 tests/                             automatické testy databáze a importu
 netlify.toml                       nastavení buildu, přesměrování, bezpečnostní hlavičky
 .env.example                       vzor proměnných prostředí

@@ -35,7 +35,7 @@
           <td class="pos"><span class="slot small">{s.position ?? '–'}</span></td>
           <th scope="row" class="team">
             <a href="/tymy/{s.team_id}">
-              <TeamBadge {team} size={30} />
+              <TeamBadge {team} size={30} eager />
               <span class="full">{team?.name ?? s.team_id}</span>
               <span class="short">{team?.short_name ?? team?.code}</span>
             </a>

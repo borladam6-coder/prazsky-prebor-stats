@@ -141,7 +141,7 @@
     <p class="empty">Tým neexistuje.</p>
   {:else}
     <header class="head" style:--team={team.color}>
-      <TeamBadge {team} size={72} />
+      <TeamBadge {team} size={72} eager />
       <div>
         <h1>{team.name}</h1>
         {#if standing}

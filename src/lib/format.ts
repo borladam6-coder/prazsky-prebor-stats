@@ -18,12 +18,14 @@ export function num(value: number | string | null | undefined): string {
 
 const dayFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'numeric' });
 const dateFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, day: 'numeric', month: 'numeric', year: 'numeric' });
+const longFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const timeFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
 const monthFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, month: 'long', year: 'numeric' });
 const stampFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export const day = (iso: string | null) => (iso ? dayFmt.format(new Date(iso)) : 'termín neurčen');
 export const date = (iso: string | null) => (iso ? dateFmt.format(new Date(iso)) : '—');
+export const longDate = (iso: string | null) => (iso ? longFmt.format(new Date(iso)) : 'termín neurčen');
 export const time = (iso: string | null) => (iso ? timeFmt.format(new Date(iso)) : '');
 export const stamp = (iso: string | null) => (iso ? stampFmt.format(new Date(iso)) : '');
 
