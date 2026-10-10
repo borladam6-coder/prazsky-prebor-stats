@@ -4,7 +4,7 @@
   import { fly, fade } from 'svelte/transition';
   import { league } from '../league.svelte.ts';
   import { resultDef } from '../stats.ts';
-  import { plural } from '../format.ts';
+  import { outsWord, plural } from '../format.ts';
   import {
     applyPlay, batterChoices, defaultPlay, defaultRbi, destLabel, occupied, outsOn, runnerChoices, runsOn, validatePlay,
     type Base, type Bases, type Dest, type Play
@@ -103,8 +103,11 @@
   }
 
   const name = (id: string | null | undefined) => league.player(id)?.name ?? '?';
-  const outsWord = (n: number) => `${n} ${plural(n, ['aut', 'auty', 'autů'])}`;
-  const title = $derived(result ? `${result} – ${resultDef(result)?.label}` : 'Pohyb běžců');
+  const title = $derived.by(() => {
+    if (!result) return 'Pohyb běžců';
+    const label = resultDef(result)?.label ?? result;
+    return label.toUpperCase() === result ? label : `${result} – ${label}`;
+  });
 
   function submit(e: SubmitEvent) {
     e.preventDefault();
@@ -129,7 +132,7 @@
         <div class="choices">
           {#each batterChoices(result) as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={play.batterTo === d} onclick={() => setBatter(d)}>
-              {d === 0 ? 'Aut' : d === 4 ? 'Doběhl' : `${d}. meta`}
+              {d === 0 ? 'Out' : d === 4 ? 'Doběhl' : `${d}. meta`}
             </button>
           {/each}
         </div>

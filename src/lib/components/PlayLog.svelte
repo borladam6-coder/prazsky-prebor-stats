@@ -61,7 +61,7 @@
                   {#if p.stole.length}<span>ukradená meta: {p.stole.map(short).join(', ')}</span>{/if}
                   {#if p.scored.length}<span class="sc">doběh: {p.scored.map(short).join(', ')}</span>{/if}
                   {#if p.rbi}<span>{p.rbi} RBI</span>{/if}
-                  {#if p.inningEnded}<span class="end">3. aut, konec poloviny</span>{:else if p.outs}<span class="out">{p.outs === 1 ? `${p.outsAfter}. aut` : `${p.outs} auty (${p.outsAfter} celkem)`}</span>{/if}
+                  {#if p.inningEnded}<span class="end">3. out, konec poloviny</span>{:else if p.outs}<span class="out">{p.outs === 1 ? `${p.outsAfter}. out` : `double play (${p.outsAfter}. out)`}</span>{/if}
                 </span>
               </span>
             {/if}

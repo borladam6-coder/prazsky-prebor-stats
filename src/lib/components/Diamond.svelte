@@ -52,9 +52,9 @@
     {/if}
   {/each}
 
-  <span class="outs" aria-label="{outs} autů">
+  <span class="outs" aria-label="{outs} outů">
     {#each [0, 1, 2] as i (i)}<span class="dot" class:on={i < outs}></span>{/each}
-    <span class="ol">auty</span>
+    <span class="ol">outy</span>
   </span>
 </div>
 

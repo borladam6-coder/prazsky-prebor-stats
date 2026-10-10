@@ -14,12 +14,14 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 ## Živý zápis
 
-1. V detailu zápasu (nejdřív 2 hodiny před začátkem) klikni **Zapisovat živě** a vyber tým.
+1. V detailu zápasu (nejdřív 2 hodiny před začátkem) klikni **Zapisovat živě** a vyber režim:
+   - **Zapisovat celý zápas:** zadáš sestavu hostů, pak domácích, a dáš Začít zápas. Pálka se po 3 outech střídá (hosté ▲, domácí ▼).
+   - **Zapisovat jen jeden tým:** vybereš tým a klikáš jeho pálkaře, pořadí se posouvá a soupeř se nepřepíná.
 2. Klepáním na hráče ze soupisky sestav pořadí pálkařů a dej **Začít zápis**.
 3. U pálkaře na řadě klepni na výsledek. Když jsou mety prázdné, uloží se hned. Když jsou na metách běžci, ukáže se, co se s nimi stalo. Výchozí návrh odpovídá běžnému průběhu, třeba singl posune jen vynucené běžce, takže 4 singly po sobě dají 1 bod. Stačí změnit, co bylo jinak, a dát **Uložit**.
 4. Klepnutím na běžce na diamantu zapíšeš ukradenou metu, postup bez odpalu nebo aut běžce.
 5. **Zpět** vrátí poslední akci. **Pořadí a střídání** a **Opravit stav** řeší náhradníky, náhradní běžce nebo špatně zapsané auty.
-6. **Zapisovat i soupeře** přidá sestavu druhého týmu. Od té chvíle je to normální zápis zápasu: hosté pálí v horní polovině směny (▲), domácí v dolní (▼) a po 3 autech se pálka sama přepne. Zpět pak vrací poslední akci zápasu bez ohledu na tým.
+6. V režimu celého zápasu vrací Zpět poslední akci zápasu bez ohledu na tým.
 
 **Sledovat** (z přehledu, detailu zápasu nebo výběru na stránce živého zápisu) otevře pohled jen pro diváky: skóre, směna a auty, diamant s běžci, kdo je na pálce, skóre po směnách, průběh zápasu po polovinách směn a sestavy s dnešními výsledky. Aktualizuje se sám.
 

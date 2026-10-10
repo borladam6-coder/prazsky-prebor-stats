@@ -14,7 +14,7 @@
   import { RESULTS, resultDef } from '#lib/stats.ts';
   import { defaultPlay, runsOn, type Base, type Bases, type Play } from '#lib/live.ts';
   import { battingTeam } from '#lib/plays.ts';
-  import { plural, time } from '#lib/format.ts';
+  import { outsWord, plural, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
   import type { GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance } from '#lib/types.ts';
   import type { PlayItem } from '#lib/plays.ts';
@@ -30,8 +30,16 @@
   const game = $derived(league.game(id));
   const home = $derived(league.team(game?.home_team_id));
   const away = $derived(league.team(game?.away_team_id));
-  /** team picked in the URL (used while only one team is scored) */
+  /**
+   * Two ways of scoring, chosen at the start:
+   *  - ?rezim=tym&tym=ID  one team only: the batting order just moves on, no switching
+   *  - ?rezim=zapas       the whole game: lineups of both teams first, then the bat
+   *                       switches after three outs (visitors top, home bottom)
+   */
   const chosenId = $derived(Number(page.url.searchParams.get('tym')) || null);
+  const scoring = $derived<'game' | 'team' | null>(
+    page.url.searchParams.get('rezim') === 'zapas' ? 'game' : chosenId ? 'team' : null
+  );
 
   /** Live scoring opens two hours before the scheduled start (same rule as the database). */
   const open = $derived.by(() => {
@@ -132,8 +140,8 @@
   const running = (tid: number | undefined) => sessions.find((s) => s.team_id === tid && !s.finished);
   const homeS = $derived(running(game?.home_team_id));
   const awayS = $derived(running(game?.away_team_id));
-  const fullGame = $derived(!!homeS && !!awayS);
-  const teamId = $derived(fullGame ? battingTeam(homeS, awayS) : chosenId);
+  const fullGame = $derived(scoring === 'game' && !!homeS && !!awayS);
+  const teamId = $derived(scoring === 'game' ? (fullGame ? battingTeam(homeS, awayS) : null) : chosenId);
   const team = $derived(league.team(teamId));
   const half = $derived(fullGame ? (teamId === game?.away_team_id ? 'horní' : 'dolní') : null);
 
@@ -198,14 +206,78 @@
   const QUICK: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT'];
 
   // ------------------------------------------------------------ actions
-  function setTeam(tid: number | null) {
+  function setScoring(next: { rezim: 'zapas' } | { rezim: 'tym'; tym: number } | null) {
     const url = new URL(page.url.href);
-    if (tid) url.searchParams.set('tym', String(tid));
-    else url.searchParams.delete('tym');
+    url.searchParams.delete('rezim');
+    url.searchParams.delete('tym');
+    if (next) {
+      url.searchParams.set('rezim', next.rezim);
+      if (next.rezim === 'tym') url.searchParams.set('tym', String(next.tym));
+    }
     mode = 'score';
     sheet = null;
+    pendingAway = null;
     goto(url, { replace: false, reset: false });
   }
+  const setTeam = (tid: number | null) => setScoring(tid ? { rezim: 'tym', tym: tid } : null);
+
+  // ------------------------------------------------------------ whole game: both lineups first
+  /** lineup of the visitors kept until the home lineup is done, then both start together */
+  let pendingAway = $state<string[] | null>(null);
+  const gameAllFinished = $derived(
+    scoring === 'game' && !!game && [game.home_team_id, game.away_team_id].every((t) => sessions.find((s) => s.team_id === t)?.finished)
+  );
+  let gameRestart = $state(false);
+  /** which lineup the setup asks for: visitors first, then home */
+  const setupTeam = $derived.by(() => {
+    if (scoring !== 'game' || !game || fullGame || (gameAllFinished && !gameRestart)) return null;
+    if (!awayS && pendingAway === null) return game.away_team_id;
+    if (!homeS) return game.home_team_id;
+    return game.away_team_id;
+  });
+
+  async function startGame(homeIds: string[] | null, awayIds: string[] | null) {
+    if (!game) return;
+    await run(async () => {
+      // a team already scored by someone else keeps going; the other joins at the right inning
+      if (awayIds && !running(game.away_team_id)) {
+        const s = await liveStart(id, game.away_team_id, awayIds);
+        const other = running(game.home_team_id);
+        if (other) {
+          const inning = joinInning(other, false);
+          if (inning !== s.inning) await liveSetState(s, { inning, outs: 0, bases: [null, null, null], nextSlot: 0 });
+        }
+      }
+      if (homeIds && !running(game.home_team_id)) {
+        const s = await liveStart(id, game.home_team_id, homeIds);
+        const other = running(game.away_team_id) ?? (awayIds ? { inning: 1, outs: 0, runner_1: null, runner_2: null, runner_3: null } as LiveSession : null);
+        if (other) {
+          const inning = joinInning(other, true);
+          if (inning !== s.inning) await liveSetState(s, { inning, outs: 0, bases: [null, null, null], nextSlot: 0 });
+        }
+      }
+    }, () => {
+      pendingAway = null;
+      gameRestart = false;
+      mode = 'score';
+      lastPlay = 'Zápas začal. Na pálce jsou hosté.';
+    });
+  }
+
+  function saveSetupLineup(ids: string[]) {
+    if (!game) return;
+    if (setupTeam === game.away_team_id) {
+      if (running(game.home_team_id)) startGame(null, ids);
+      else pendingAway = ids;
+    } else {
+      startGame(ids, pendingAway);
+    }
+  }
+
+  const reopenGame = () =>
+    run(async () => {
+      for (const s of sessions.filter((x) => x.finished)) await liveFinish(s, false);
+    }, () => (lastPlay = 'Pokračuješ v zápisu zápasu.'));
 
   async function run<T>(action: () => Promise<T>, done?: (r: T) => void): Promise<boolean> {
     if (busy) return false;
@@ -372,8 +444,6 @@
   });
 
   const teamRoster = $derived(teamId ? league.teamPlayers(teamId, true) : []);
-  /** offer to add the opponent's lineup while only one team is scored */
-  const canAddOpponent = $derived(!fullGame && !!session && !session.finished && !!opponentId && !running(opponentId));
   const statusOf = (tid: number | undefined) => sessions.find((s) => s.team_id === tid);
 </script>
 
@@ -398,27 +468,40 @@
       <p class="muted">Načítám…</p>
     {:else if !open}
       <p class="empty">Živý zápis se otevře 2 hodiny před začátkem zápasu{game.starts_at ? ` (začátek v ${time(game.starts_at)})` : ''}.</p>
-    {:else if !team}
-      <!-- ---------------------------------------------------------- team picker -->
-      <a class="card watchlink rise" href="/zapasy/{id}/sledovat">
-        <span class="wi"><Icon name="live" size={24} /></span>
-        <span class="tinfo">
-          <span class="tn">Jen sledovat</span>
-          <span class="ts">Skóre, směny, kdo je na pálce a průběh zápasu, bez zapisování</span>
-        </span>
-        <Icon name="chevron" size={20} />
-      </a>
-      <p class="lead muted">Nebo zapisuj: za který tým? Sestavu soupeře můžeš přidat i potom a pálka se po 3 autech bude střídat.</p>
+    {:else if scoring === null}
+      <!-- ---------------------------------------------------------- choose the way of scoring -->
+      <div class="modes">
+        <button type="button" class="card mode rise" onclick={() => setScoring({ rezim: 'zapas' })}>
+          <span class="mi"><Icon name="board" size={24} /></span>
+          <span class="tinfo">
+            <span class="tn">Zapisovat celý zápas</span>
+            <span class="ts">Oba týmy na jednom telefonu. Nejdřív sestavy hostů i domácích, pak se pálka po 3 outech sama střídá.</span>
+          </span>
+          <Icon name="chevron" size={20} />
+        </button>
+        <a class="card mode watch rise" style:--i="1" href="/zapasy/{id}/sledovat">
+          <span class="mi"><Icon name="live" size={24} /></span>
+          <span class="tinfo">
+            <span class="tn">Jen sledovat</span>
+            <span class="ts">Skóre, směny, kdo je na pálce a průběh zápasu, bez zapisování.</span>
+          </span>
+          <Icon name="chevron" size={20} />
+        </a>
+      </div>
+
+      <h2 class="sub-h">Zapisovat jen jeden tým</h2>
+      <p class="lead muted">Klikáš pálkaře svého týmu jednoho po druhém, pořadí se samo posouvá. Soupeř se nepřepíná.</p>
       <div class="pick">
-        {#each [home, away] as t, i (t?.id)}
+        {#each [away, home] as t, i (t?.id)}
           {#if t}
             {@const s = statusOf(t.id)}
-            <button type="button" class="card tpick rise" style:--team={t.color} style:--i={i} onclick={() => setTeam(t.id)}>
+            <button type="button" class="card tpick rise" style:--team={t.color} style:--i={i + 2} onclick={() => setTeam(t.id)}>
               <TeamBadge team={t} size={52} eager />
               <span class="tinfo">
                 <span class="tn">{t.name}</span>
                 <span class="ts">
-                  {#if !s}Zápis nezačal{:else if s.finished}Zápis ukončen{:else}<span class="pill warn">Běží: {s.inning}. směna, {s.outs} {plural(s.outs, ['aut', 'auty', 'autů'])}</span>{/if}
+                  {i === 0 ? 'hosté' : 'domácí'} ·
+                  {#if !s}zápis nezačal{:else if s.finished}zápis ukončen{:else}<span class="pill warn">běží: {s.inning}. směna, {outsWord(s.outs)}</span>{/if}
                 </span>
               </span>
               <Icon name="chevron" size={20} />
@@ -426,17 +509,67 @@
           {/if}
         {/each}
       </div>
+    {:else if scoring === 'game' && gameAllFinished && !gameRestart}
+      <!-- ---------------------------------------------------------- whole game finished -->
+      <div class="card done" in:fade={{ duration: 150 }}>
+        <Icon name="flag" size={28} />
+        <h2>Živý zápis zápasu je ukončený</h2>
+        <p class="muted">Všechny zápisy jsou v box score zápasu. Pokud se ještě hraje, můžeš pokračovat.</p>
+        <div class="row">
+          <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
+          <button type="button" class="btn" disabled={busy} onclick={() => (gameRestart = true)}>Začít znovu</button>
+          <button type="button" class="btn btn-primary" disabled={busy} onclick={reopenGame}>Pokračovat v zápisu</button>
+        </div>
+      </div>
+      {#if plays.length}
+        <section class="feed">
+          <div class="feed-head"><h2>Průběh zápasu</h2></div>
+          <PlayLog {plays} awayTeamId={game.away_team_id} onedit={(p) => (editing = p)} />
+        </section>
+      {/if}
+    {:else if setupTeam}
+      <!-- ---------------------------------------------------------- whole game: lineups of both teams -->
+      {@const st = league.team(setupTeam)}
+      {@const isAway = setupTeam === game.away_team_id}
+      <ol class="steps" aria-label="Příprava zápasu">
+        {#each [away, home] as t, i (t?.id)}
+          {#if t}
+            {@const done = !!running(t.id) || (i === 0 && pendingAway !== null)}
+            <li class:current={t.id === setupTeam} class:done>
+              <span class="num">{done ? '✓' : i + 1}</span>
+              <span><strong>{i === 0 ? 'Hosté' : 'Domácí'}</strong> {t.short_name ?? t.name}{#if running(t.id)} · už se zapisuje{/if}</span>
+              {#if i === 0 && pendingAway !== null && !running(t.id)}
+                <button type="button" class="btn btn-quiet btn-sm" onclick={() => (pendingAway = null)}>Upravit</button>
+              {/if}
+            </li>
+          {/if}
+        {/each}
+      </ol>
+      <div class="teamline">
+        <TeamBadge team={st} size={30} />
+        <strong>{st?.name}</strong>
+        <span class="muted">{isAway ? 'hosté, pálí jako první' : 'domácí, pálí v dolní polovině'}</span>
+      </div>
+      {#key setupTeam}
+        <LineupEditor
+          teamId={setupTeam}
+          initial={isAway && pendingAway ? pendingAway : (lineups.find((l) => l.team_id === setupTeam)?.players ?? [])}
+          saveLabel={isAway && !running(game.home_team_id) ? 'Pokračovat na sestavu domácích' : 'Začít zápas'}
+          {busy}
+          onsave={(ids) => saveSetupLineup(ids)}
+          oncancel={() => setScoring(null)}
+        />
+      {/key}
+    {:else if !team}
+      <p class="empty">Načítám stav zápisu…</p>
     {:else if !session || mode === 'restart'}
       <!-- ---------------------------------------------------------- start: lineup -->
       <div class="teamline">
         <TeamBadge {team} size={30} />
         <strong>{team.name}</strong>
-        <button type="button" class="btn btn-quiet btn-sm" onclick={() => setTeam(null)}>Změnit tým</button>
+        <button type="button" class="btn btn-quiet btn-sm" onclick={() => setScoring(null)}>Změnit režim</button>
       </div>
-      <p class="lead muted">
-        Sestav pořadí pálkařů. Během zápasu ho jde kdykoli upravit (střídání, další hráč).
-        {#if running(opponentId)}Soupeř už se zapisuje, takže po startu se pálka po 3 autech bude sama střídat.{/if}
-      </p>
+      <p class="lead muted">Sestav pořadí pálkařů. Během zápasu ho jde kdykoli upravit (střídání, další hráč).</p>
       <LineupEditor
         teamId={team.id}
         initial={lineup}
@@ -480,7 +613,7 @@
       <!-- ---------------------------------------------------------- state fix -->
       <section class="card fix" in:fade={{ duration: 150 }}>
         <h2>Opravit stav: {team.short_name ?? team.name}</h2>
-        <p class="muted">Pro případy, kdy se něco stalo mimo běžný zápis: náhradní běžec, špatně zapsané auty, přeskočený pálkař.</p>
+        <p class="muted">Pro případy, kdy se něco stalo mimo běžný zápis: náhradní běžec, špatně zapsané outy, přeskočený pálkař.</p>
         <div class="grid">
           <label>
             <span>Směna</span>
@@ -491,8 +624,8 @@
             </span>
           </label>
           <div class="lbl">
-            <span>Auty</span>
-            <div class="seg" role="group" aria-label="Auty">
+            <span>Outy</span>
+            <div class="seg" role="group" aria-label="Outy">
               {#each [0, 1, 2] as n (n)}<button type="button" aria-pressed={fix.outs === n} onclick={() => (fix.outs = n)}>{n}</button>{/each}
             </div>
           </div>
@@ -586,11 +719,7 @@
         </button>
         <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => (mode = 'lineup')}><Icon name="player" size={16} /> Pořadí a střídání</button>
         <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={openFix}><Icon name="tune" size={16} /> Opravit stav</button>
-        {#if canAddOpponent}
-          <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => setTeam(opponentId!)}>
-            <Icon name="plus" size={16} /> Zapisovat i soupeře
-          </button>
-        {/if}
+
         {#if confirmFinish}
           <span class="confirm">
             <button type="button" class="btn btn-sm danger" disabled={busy} onclick={() => finish(true)}>{fullGame ? 'Ukončit zápis obou týmů' : 'Opravdu ukončit'}</button>
@@ -754,32 +883,108 @@
     font-size: 14px;
     color: var(--muted);
   }
-  .watchlink {
+  .modes {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 30px;
+  }
+  @media (min-width: 760px) {
+    .modes {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .mode {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 14px;
-    padding: 16px 18px;
-    margin-bottom: 22px;
+    padding: 18px;
+    text-align: left;
     text-decoration: none;
-    border-color: color-mix(in srgb, var(--neg) 40%, var(--line));
+    color: var(--ink);
+    cursor: pointer;
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
     background:
-      radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--neg) 14%, transparent), transparent 60%),
+      radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
       var(--surface);
     transition: transform 160ms, border-color 160ms;
   }
-  .watchlink:hover {
+  .mode:hover {
     transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .mode.watch {
+    border-color: color-mix(in srgb, var(--neg) 40%, var(--line));
+    background:
+      radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--neg) 12%, transparent), transparent 60%),
+      var(--surface);
+  }
+  .mode.watch:hover {
     border-color: var(--neg);
   }
-  .wi {
+  .mi {
     display: grid;
     place-items: center;
     width: 52px;
     height: 52px;
     border-radius: 16px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .watch .mi {
     background: var(--neg-soft);
     color: var(--neg);
+  }
+  .sub-h {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  .steps {
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .steps li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 14.5px;
+  }
+  .steps li.current {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+  .steps li.done {
+    color: var(--ink);
+  }
+  .steps .num {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--surface-3);
+    font-weight: 800;
+    font-size: 13px;
+  }
+  .steps .current .num {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .steps .done .num {
+    background: var(--pos);
+    color: #06140c;
+  }
+  .steps li .btn {
+    margin-left: auto;
   }
   .teamline {
     display: flex;
