@@ -4,6 +4,7 @@
 import { supabase } from './supabase.ts';
 import { identity } from './identity.svelte.ts';
 import { admin } from './admin.svelte.ts';
+import { league } from './league.svelte.ts';
 import type {
   ChangeEntry, ChangeGroup, GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance, Player,
   PlayerGameLine, PlayerTotals, TeamGameLine, TeamTotals
@@ -303,6 +304,58 @@ export const livePlay = (s: LiveSession, play: Play) =>
     p_runners: play.runners,
     p_rbi: play.result ? play.rbi : null
   });
+
+/**
+ * One play with a client id (offline queue). Sending the same id twice applies it once,
+ * so a request whose answer got lost can simply be sent again. Gives up after 15 s.
+ */
+export async function livePlayOnce(clientId: string, s: Pick<LiveSession, 'game_id' | 'team_id' | 'version'>, play: Play): Promise<LiveSession> {
+  const actor = await identity.require();
+  if (!actor) throw new WriteCancelled();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    const { data, error } = await db()
+      .rpc('live_play_once', {
+        p_client_id: clientId,
+        ...live(s.game_id, s.team_id),
+        p_expected_version: s.version,
+        p_result: play.result,
+        p_batter_to: play.batterTo,
+        p_runners: play.runners,
+        p_rbi: play.result ? play.rbi : null,
+        p_actor: actor,
+        p_device: identity.device
+      })
+      .abortSignal(ctrl.signal);
+    if (error) throw error;
+    return data as LiveSession;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** True when the request did not reach the database (no signal, timeout), as opposed to a refusal. */
+export function isNetworkError(e: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const err = e as { message?: string; name?: string; code?: string } | null;
+  const msg = `${err?.name ?? ''} ${err?.message ?? String(e)}`;
+  return /Failed to fetch|NetworkError|Load failed|network|AbortError|aborted|timed? ?out/i.test(msg) && !(err?.code ?? '').startsWith('P');
+}
+
+/** Batting order the team used in its most recent earlier live-scored game (still-active players only). */
+export async function previousLineup(teamId: number, before: string | null, excludeGameId: number): Promise<string[] | null> {
+  const { data, error } = await db().from('live_lineups').select('game_id, players').eq('team_id', teamId).neq('game_id', excludeGameId);
+  if (error) throw error;
+  const limit = before ? new Date(before).getTime() : Infinity;
+  const best = (data ?? [])
+    .map((r) => ({ players: r.players as string[], at: new Date(league.game(r.game_id as number)?.starts_at ?? 0).getTime() }))
+    .filter((r) => r.at <= limit)
+    .sort((a, b) => b.at - a.at)[0];
+  if (!best) return null;
+  const ids = best.players.filter((id) => league.player(id)?.active && league.player(id)?.team_id === teamId);
+  return ids.length ? ids : null;
+}
 
 /** Undo the last play of this team, or with `wholeGame` the last play of the game (both teams scored). */
 export const liveUndo = (s: LiveSession, wholeGame = false) =>

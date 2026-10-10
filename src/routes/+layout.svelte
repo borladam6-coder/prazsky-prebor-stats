@@ -227,6 +227,10 @@
   .nav-mobile a[aria-current='page'] {
     color: var(--accent-text);
   }
+  /* live scoring: the result pad takes the place of the menu */
+  :global(html.has-dock) .nav-mobile {
+    display: none;
+  }
 
   @media (min-width: 900px) {
     .nav-desktop {

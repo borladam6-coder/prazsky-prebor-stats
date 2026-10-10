@@ -7,10 +7,11 @@
   import { league } from '#lib/league.svelte.ts';
   import { supabase } from '#lib/supabase.ts';
   import {
-    liveOfGame, gameEntries, liveStart, liveSetLineup, liveSetState, liveFinish, livePlay, liveUndo,
+    liveOfGame, gameEntries, liveStart, liveSetLineup, liveSetState, liveFinish, liveUndo,
     gamePlayLog, liveDeletePlay, liveRewind, liveAdjustRuns, updatePlateAppearance, revertGroup,
-    errorMessage, WriteCancelled
+    errorMessage, isNetworkError, WriteCancelled
   } from '#lib/api.ts';
+  import { PlayQueue } from '#lib/queue.svelte.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
   import { defaultPlay, runsOn, type Base, type Bases, type Play } from '#lib/live.ts';
   import { battingTeam } from '#lib/plays.ts';
@@ -24,6 +25,9 @@
   import LineupEditor from '#lib/components/LineupEditor.svelte';
   import PlayLog from '#lib/components/PlayLog.svelte';
   import EditPlaySheet from '#lib/components/EditPlaySheet.svelte';
+  import AdminPanel from '#lib/components/AdminPanel.svelte';
+  import ResultPad from '#lib/components/ResultPad.svelte';
+  import ScoringHints from '#lib/components/ScoringHints.svelte';
   import Icon from '#lib/components/Icon.svelte';
 
   const id = $derived(Number(page.params.id));
@@ -49,7 +53,8 @@
   });
   const started = $derived(!!game && league.isPlayable(game));
 
-  let sessions = $state<LiveSession[]>([]);
+  /** sessions as stored in the database */
+  let srvSessions = $state<LiveSession[]>([]);
   let lineups = $state<LiveLineup[]>([]);
   let pas = $state<PlateAppearance[]>([]);
   let extras = $state<GameExtras[]>([]);
@@ -57,11 +62,14 @@
   let loadError = $state<string | null>(null);
   let busy = $state(false);
 
-  let mode = $state<'score' | 'lineup' | 'state' | 'restart'>('score');
+  let mode = $state<'score' | 'lineup' | 'state' | 'restart' | 'admin'>('score');
+  let moreOpen = $state(false);
   let sheet = $state<{ result: PaResult | null; runnerFrom: Base | null } | null>(null);
   let confirmFinish = $state(false);
   /** short summary of the last saved play, shown on the scoreboard (toasts would cover the pad) */
   let lastPlay = $state<string | null>(null);
+  /** the last line is a saved play (shows the save state) */
+  let lastSaved = $state(false);
   let historyList = $state<{ reload: () => Promise<void> }>();
   let plays = $state<PlayItem[]>([]);
   let editing = $state<PlayItem | null>(null);
@@ -70,7 +78,7 @@
     try {
       const [l, e] = await Promise.all([liveOfGame(id), gameEntries(id)]);
       plays = await gamePlayLog(id, e.pas);
-      sessions = l.sessions;
+      srvSessions = l.sessions;
       lineups = l.lineups;
       pas = e.pas;
       extras = e.extras;
@@ -81,6 +89,26 @@
       loaded = true;
     }
   }
+
+  // plays wait on the phone until they reach the database (see queue.svelte.ts)
+  let queue = $state<PlayQueue | null>(null);
+  $effect(() => {
+    const gameId = id;
+    const q = untrack(
+      () =>
+        new PlayQueue(gameId, async () => {
+          await load();
+          historyList?.reload();
+        })
+    );
+    queue = q;
+    return () => q.destroy();
+  });
+  const pending = $derived(queue?.pending ?? 0);
+  /** sessions as the scorer sees them: with plays that are still on the way */
+  const sessions = $derived(
+    srvSessions.map((s) => (queue ? queue.effective(s, lineups.find((l) => l.team_id === s.team_id)?.players ?? []) : s))
+  );
 
   $effect(() => {
     const gameId = id;
@@ -134,6 +162,41 @@
     };
   });
 
+  // ------------------------------------------------------------ result pad docked at the bottom (phones)
+  /**
+   * On phones the result pad sits fixed at the bottom, where the thumb is, in place of
+   * the navigation bar. Toasts and the page end move above it (they use --nav-h).
+   */
+  function dock(node: HTMLElement) {
+    const root = document.documentElement;
+    const phone = window.matchMedia('(max-width: 899px)');
+    const apply = () => {
+      if (phone.matches) {
+        root.classList.add('has-dock');
+        root.style.setProperty('--nav-h', `${node.offsetHeight}px`);
+      } else {
+        root.classList.remove('has-dock');
+        root.style.removeProperty('--nav-h');
+      }
+    };
+    const ro = new ResizeObserver(apply);
+    ro.observe(node);
+    phone.addEventListener('change', apply);
+    apply();
+    return {
+      destroy() {
+        ro.disconnect();
+        phone.removeEventListener('change', apply);
+        root.classList.remove('has-dock');
+        root.style.removeProperty('--nav-h');
+      }
+    };
+  }
+
+  /** first-time help (also from the menu) */
+  let hintsOpen = $state(false);
+
+
   // ------------------------------------------------------------ derived state
   // Both teams scored on this device → a normal scorebook: the visitors bat in the top
   // of the inning, the home team in the bottom, and after three outs the bat switches.
@@ -172,7 +235,8 @@
 
   function runsOf(tid: number | undefined) {
     if (!tid) return 0;
-    return extras.reduce((sum, x) => sum + (league.player(x.player_id)?.team_id === tid ? x.runs : 0), 0);
+    const saved = extras.reduce((sum, x) => sum + (league.player(x.player_id)?.team_id === tid ? x.runs : 0), 0);
+    return saved + (queue?.pendingRuns(tid) ?? 0);
   }
   const ourRuns = $derived(runsOf(teamId ?? undefined));
   const opponentId = $derived(game ? (teamId === game.home_team_id ? game.away_team_id : game.home_team_id) : undefined);
@@ -182,7 +246,11 @@
 
   function lineOf(playerId: string | undefined) {
     if (!playerId) return '';
-    const list = pas.filter((p) => p.player_id === playerId);
+    const waiting = (queue?.items ?? []).filter((i) => i.batter === playerId && i.play.result);
+    const list = [
+      ...pas.filter((p) => p.player_id === playerId),
+      ...waiting.map((i) => ({ result: i.play.result!, rbi: i.play.rbi }))
+    ];
     const x = extras.find((e) => e.player_id === playerId);
     if (!list.length && !x?.runs && !x?.stolen_bases) return 'dnes poprvé na pálce';
     const h = list.filter((r) => resultDef(r.result)?.group === 'hit').length;
@@ -203,7 +271,6 @@
     if (code === 'SH') return occupiedCount > 0 && session.outs < 2;
     return true;
   }
-  const QUICK: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT'];
 
   // ------------------------------------------------------------ actions
   function setScoring(next: { rezim: 'zapas' } | { rezim: 'tym'; tym: number } | null) {
@@ -290,7 +357,7 @@
       return true;
     } catch (e) {
       if (e instanceof WriteCancelled) return false;
-      toasts.show(errorMessage(e), 'error');
+      toasts.show(isNetworkError(e) ? 'Bez signálu. Tohle jde uložit jen s připojením, zkus to znovu.' : errorMessage(e), 'error');
       await load(); // e.g. someone else scored in the meantime
       return false;
     } finally {
@@ -304,31 +371,54 @@
     return runs ? `${head} · +${runs} ${plural(runs, ['bod', 'body', 'bodů'])}` : head;
   }
 
-  async function submit(play: Play) {
-    if (!session) return;
-    const name = batter?.name;
+  /** The play is shown at once and sent in the background (works without signal too). */
+  function submit(play: Play) {
+    if (!session || !queue) return;
     lastWasUndo = false;
-    const ok = await run(
-      () => livePlay(session, play),
-      () => (lastPlay = describe(play, name))
-    );
-    if (ok) sheet = null;
+    lastPlay = describe(play, batter?.name);
+    lastSaved = true;
+    queue.add(session, lineup, play);
+    sheet = null;
+    try {
+      navigator.vibrate?.(18);
+    } catch {
+      /* not supported */
+    }
   }
 
   function tapResult(code: PaResult) {
     if (!session || busy) return;
     toasts.list = [];
-    if (occupiedCount === 0 && QUICK.includes(code)) {
-      submit(defaultPlay(code, bases, session.outs));
-    } else {
-      sheet = { result: code, runnerFrom: null };
-    }
+    // nobody on base: nothing to ask, the usual outcome is saved right away (Zpět takes it back)
+    if (occupiedCount === 0) submit(defaultPlay(code, bases, session.outs));
+    else sheet = { result: code, runnerFrom: null };
+  }
+
+  /** with plays waiting, actions that need the exact server state are not possible */
+  function synced(): boolean {
+    if (!pending) return true;
+    toasts.show(
+      queue?.status === 'offline'
+        ? `Bez signálu čeká ${pending} ${plural(pending, ['akce', 'akce', 'akcí'])}. Tohle půjde, až se odešlou.`
+        : 'Počkej, až se odešlou čekající akce.',
+      'error'
+    );
+    return false;
   }
 
   const undo = () => {
     const s = session;
     if (!s) return;
     lastWasUndo = true;
+    lastSaved = false;
+    if (queue?.undoLast()) {
+      lastPlay = 'Poslední akce vrácena.';
+      return;
+    }
+    if (pending) {
+      toasts.show('Akce se právě odesílá, zkus Zpět za chvilku.', 'error');
+      return;
+    }
     run(() => liveUndo(s, fullGame), () => (lastPlay = 'Poslední akce vrácena.'));
   };
 
@@ -377,7 +467,7 @@
   // manual state correction
   let fix = $state({ inning: 1, outs: 0, bases: [null, null, null] as (string | null)[], nextSlot: 0 });
   function openFix() {
-    if (!session) return;
+    if (!session || !synced()) return;
     fix = { inning: session.inning, outs: session.outs, bases: [...bases], nextSlot: session.next_slot };
     mode = 'state';
   }
@@ -391,6 +481,24 @@
   const editingPa = $derived(editing?.paId ? (pas.find((p) => p.id === editing!.paId) ?? null) : null);
   const latestPlayId = $derived([...plays].reverse().find((p) => p.kind === 'play')?.id ?? null);
   const closeEdit = () => (editing = null);
+  const editPlay = (p: PlayItem) => {
+    if (synced()) editing = p;
+  };
+  const openLineup = () => {
+    if (synced()) mode = 'lineup';
+  };
+  function openAdmin() {
+    moreOpen = false;
+    if (synced()) mode = 'admin';
+  }
+  /** last saved play, with how it is doing on its way to the database */
+  const saveState = $derived(
+    !queue ? null
+    : queue.status === 'error' ? 'error'
+    : queue.status === 'offline' ? 'offline'
+    : pending ? 'sending'
+    : 'saved'
+  );
 
   const saveResult = (pa: PlateAppearance, result: PaResult, rbi: number) =>
     run(() => updatePlateAppearance(pa, { result, rbi }), () => {
@@ -443,9 +551,21 @@
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
   });
 
+  /** the scoring screen (scoreboard + pad) is on */
+  const scoringVisible = $derived(
+    open && scoring !== null && !setupTeam && !(scoring === 'game' && gameAllFinished && !gameRestart) &&
+      !!team && !!session && !session.finished && mode === 'score'
+  );
+
   const teamRoster = $derived(teamId ? league.teamPlayers(teamId, true) : []);
   const statusOf = (tid: number | undefined) => sessions.find((s) => s.team_id === tid);
 </script>
+
+<svelte:window
+  onpointerdown={(e) => {
+    if (moreOpen && !(e.target as Element | null)?.closest?.('.more-wrap')) moreOpen = false;
+  }}
+/>
 
 <svelte:head>
   <title>Živě: {home?.short_name ?? ''} – {away?.short_name ?? ''} – Pražský přebor mužů</title>
@@ -524,7 +644,7 @@
       {#if plays.length}
         <section class="feed">
           <div class="feed-head"><h2>Průběh zápasu</h2></div>
-          <PlayLog {plays} awayTeamId={game.away_team_id} onedit={(p) => (editing = p)} />
+          <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} />
         </section>
       {/if}
     {:else if setupTeam}
@@ -553,6 +673,7 @@
       {#key setupTeam}
         <LineupEditor
           teamId={setupTeam}
+          gameId={id}
           initial={isAway && pendingAway ? pendingAway : (lineups.find((l) => l.team_id === setupTeam)?.players ?? [])}
           saveLabel={isAway && !running(game.home_team_id) ? 'Pokračovat na sestavu domácích' : 'Začít zápas'}
           {busy}
@@ -572,6 +693,7 @@
       <p class="lead muted">Sestav pořadí pálkařů. Během zápasu ho jde kdykoli upravit (střídání, další hráč).</p>
       <LineupEditor
         teamId={team.id}
+        gameId={id}
         initial={lineup}
         saveLabel={session ? 'Začít znovu od 1. směny' : 'Začít zápis'}
         {busy}
@@ -594,7 +716,7 @@
         <section class="feed">
           <div class="feed-head"><h2>Průběh zápasu</h2></div>
           <p class="muted feed-hint">I po skončení jde u každé akce opravit výsledek nebo doběhy, případně akci smazat.</p>
-          <PlayLog {plays} awayTeamId={game.away_team_id} onedit={(p) => (editing = p)} />
+          <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} />
         </section>
       {/if}
     {:else if mode === 'lineup'}
@@ -602,6 +724,7 @@
       <div class="teamline"><TeamBadge {team} size={30} /><strong>{team.name}</strong></div>
       <LineupEditor
         teamId={team.id}
+        gameId={id}
         initial={lineup}
         nextSlot={session.next_slot}
         saveLabel="Uložit pořadí"
@@ -609,6 +732,12 @@
         onsave={saveLineup}
         oncancel={() => (mode = 'score')}
       />
+    {:else if mode === 'admin'}
+      <!-- ---------------------------------------------------------- administrator -->
+      <div class="row admin-back">
+        <button type="button" class="btn btn-dark btn-sm" onclick={() => (mode = 'score')}><Icon name="back" size={16} /> Zpět k zápisu</button>
+      </div>
+      <AdminPanel {game} startOpen onchanged={() => { load(); historyList?.reload(); }} />
     {:else if mode === 'state'}
       <!-- ---------------------------------------------------------- state fix -->
       <section class="card fix" in:fade={{ duration: 150 }}>
@@ -645,6 +774,7 @@
             </select>
           </label>
         </div>
+        <p class="muted fix-more">Je zápis úplně špatně? <button type="button" class="link-accent linkbtn" onclick={openAdmin}>Správa zápasu</button> umí smazat celý záznam nebo nastavit konečné skóre (kód správce).</p>
         <div class="row end">
           <button type="button" class="btn btn-quiet" onclick={() => (mode = 'score')}>Zrušit</button>
           <button type="button" class="btn btn-primary" disabled={busy} onclick={saveFix}><Icon name="check" size={18} /> Uložit stav</button>
@@ -679,18 +809,44 @@
               <span class="v">{runsOf(opponentId)}</span>
             </div>
           {/if}
-          <button type="button" class="undo" disabled={busy} onclick={undo} aria-label="Vrátit poslední akci">
+          <button type="button" class="undo" data-hint="undo" disabled={busy} onclick={undo} aria-label="Vrátit poslední akci">
             <Icon name="undo" size={20} /><span>Zpět</span>
           </button>
         </div>
 
-        <Diamond {bases} outs={session.outs} onrunner={(b) => (sheet = { result: null, runnerFrom: b })} />
+        <div data-hint="field">
+          <Diamond {bases} outs={session.outs} onrunner={(b) => (sheet = { result: null, runnerFrom: b })} />
+        </div>
         {#if lastPlay}
-          {#key lastPlay}<p class="last" in:fade={{ duration: 200 }}><Icon name="check" size={16} /> {lastPlay}</p>{/key}
+          {#key lastPlay + pending}
+            <p class="last" in:fade={{ duration: 200 }}>
+              {#if lastSaved && saveState === 'offline'}
+                <span class="sync off"><Icon name="wifi-off" size={15} /> Bez signálu · čeká {pending}</span>
+              {:else if lastSaved && saveState === 'sending'}
+                <span class="sync go"><span class="spin"></span> Ukládám</span>
+              {:else if lastSaved && saveState === 'saved'}
+                <span class="sync ok"><Icon name="check" size={15} /> Uloženo</span>
+              {:else}
+                <Icon name="check" size={16} />
+              {/if}
+              <span class="lt">{lastPlay}</span>
+            </p>
+          {/key}
         {/if}
       </section>
 
-      {#key session.team_id + ':' + session.next_slot + ':' + session.version}
+      {#if queue && queue.status === 'error'}
+        <div class="qerr card" role="alert" in:fade={{ duration: 150 }}>
+          <strong>{pending} {plural(pending, ['akci', 'akce', 'akcí'])} se nepodařilo uložit</strong>
+          <p>{queue.error}</p>
+          <div class="row">
+            <button type="button" class="btn btn-primary btn-sm" onclick={() => queue?.flush()}>Zkusit znovu</button>
+            <button type="button" class="btn btn-quiet btn-sm" onclick={() => { queue?.discard(); lastPlay = 'Čekající akce zahozeny, stav je načtený znovu.'; lastSaved = false; }}>Zahodit čekající</button>
+          </div>
+        </div>
+      {/if}
+
+      {#key session.team_id + ':' + session.next_slot + ':' + session.inning + ':' + session.version}
         <section class="atbat card" in:fly={{ x: 24, duration: 220 }}>
           <span class="jn" aria-hidden="true">{batter?.jersey_number ?? '–'}</span>
           <span class="info">
@@ -704,30 +860,47 @@
         </section>
       {/key}
 
-      <div class="pad" role="group" aria-label="Výsledek na pálce">
-        {#each RESULTS as r (r.code)}
-          <button type="button" class="res g-{r.group}" disabled={busy || !allowed(r.code)} onclick={() => tapResult(r.code)}>
-            <span class="code">{r.code}</span>
-            <span class="lbl">{r.label}</span>
-          </button>
-        {/each}
+      <div class="dock" use:dock data-hint="pad">
+        <ResultPad disabled={busy} {allowed} onpick={tapResult} />
       </div>
 
       <div class="tools">
         <button type="button" class="btn btn-dark btn-sm" disabled={busy || occupiedCount === 0} onclick={() => (sheet = { result: null, runnerFrom: ([3, 2, 1] as Base[]).find((b) => bases[b - 1]) ?? null })}>
           <Icon name="swap" size={16} /> Pohyb běžců
         </button>
-        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => (mode = 'lineup')}><Icon name="player" size={16} /> Pořadí a střídání</button>
-        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={openFix}><Icon name="tune" size={16} /> Opravit stav</button>
-
-        {#if confirmFinish}
-          <span class="confirm">
-            <button type="button" class="btn btn-sm danger" disabled={busy} onclick={() => finish(true)}>{fullGame ? 'Ukončit zápis obou týmů' : 'Opravdu ukončit'}</button>
-            <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmFinish = false)}>Ne</button>
-          </span>
-        {:else}
-          <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmFinish = true)}><Icon name="flag" size={16} /> Ukončit zápis</button>
-        {/if}
+        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={openLineup}><Icon name="player" size={16} /> Pořadí a střídání</button>
+        <span class="more-wrap">
+          <button type="button" class="btn btn-quiet btn-sm" aria-expanded={moreOpen} aria-haspopup="menu" onclick={() => { moreOpen = !moreOpen; confirmFinish = false; }}>
+            <Icon name="more" size={16} /> Další možnosti
+          </button>
+          {#if moreOpen}
+            <div class="menu card" role="menu" transition:fade={{ duration: 120 }}>
+              <button type="button" role="menuitem" onclick={() => { moreOpen = false; openFix(); }}>
+                <Icon name="tune" size={18} /><span><strong>Opravit stav</strong><small>Směna, outy, běžci, kdo je na pálce</small></span>
+              </button>
+              {#if confirmFinish}
+                <div class="confirm">
+                  <span>{fullGame ? 'Ukončit zápis obou týmů?' : 'Opravdu ukončit zápis?'}</span>
+                  <button type="button" class="btn btn-sm danger" disabled={busy} onclick={() => { moreOpen = false; if (synced()) finish(true); }}>Ukončit</button>
+                  <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmFinish = false)}>Ne</button>
+                </div>
+              {:else}
+                <button type="button" role="menuitem" onclick={() => (confirmFinish = true)}>
+                  <Icon name="flag" size={18} /><span><strong>Ukončit zápis</strong><small>Po posledním outu zápasu</small></span>
+                </button>
+              {/if}
+              <a role="menuitem" href="/zapasy/{id}/sledovat">
+                <Icon name="live" size={18} /><span><strong>Pohled diváka</strong><small>Jak zápas vidí ostatní</small></span>
+              </a>
+              <button type="button" role="menuitem" onclick={openAdmin}>
+                <Icon name="shield" size={18} /><span><strong>Správa zápasu</strong><small>Smazat záznam, ruční skóre (kód správce)</small></span>
+              </button>
+              <button type="button" role="menuitem" onclick={() => { moreOpen = false; hintsOpen = true; }}>
+                <Icon name="help" size={18} /><span><strong>Jak zapisovat</strong><small>Krátká nápověda</small></span>
+              </button>
+            </div>
+          {/if}
+        </span>
       </div>
 
       {#if !started}
@@ -740,7 +913,18 @@
           <a class="link-accent" href="/zapasy/{id}?historie">Historie změn</a>
         </div>
         <p class="muted feed-hint">Tužkou u akce opravíš výsledek, doběhy ve směně, akci smažeš nebo k ní vrátíš celý zápis.</p>
-        <PlayLog {plays} awayTeamId={game.away_team_id} onedit={(p) => (editing = p)} />
+        {#if pending}
+          <ol class="waiting" aria-label="Akce čekající na odeslání">
+            {#each [...(queue?.items ?? [])].reverse() as w (w.id)}
+              <li transition:fade={{ duration: 150 }}>
+                <span class="chip">{w.play.result ?? 'SB'}</span>
+                <span>{w.play.result ? (league.player(w.batter)?.name ?? '?') : 'Pohyb běžců'}</span>
+                <span class="muted">{queue?.status === 'offline' ? 'čeká na signál' : queue?.status === 'error' ? 'neuloženo' : 'ukládám…'}</span>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+        <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} />
       </section>
     {/if}
   {/if}
@@ -761,6 +945,10 @@
     oncanceladjust={cancelAdjust}
     onclose={closeEdit}
   />
+{/if}
+
+{#if scoringVisible && !sheet && !editing}
+  <ScoringHints force={hintsOpen} onclose={() => (hintsOpen = false)} />
 {/if}
 
 {#if sheet && session && !session.finished}
@@ -1215,87 +1403,184 @@
     text-overflow: ellipsis;
   }
 
-  /* result pad */
-  .pad {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 7px;
+  /* result pad: on phones fixed at the bottom, where the thumb is (instead of the menu) */
+  .dock {
     margin-top: 10px;
   }
-  .res {
+  @media (max-width: 899px) {
+    .dock {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 31;
+      margin: 0;
+      padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: saturate(1.4) blur(14px);
+      -webkit-backdrop-filter: saturate(1.4) blur(14px);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -8px 24px rgb(0 0 0 / 0.08);
+    }
+  }
+
+  /* save state of the last play */
+  .last .lt {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .sync.ok {
+    background: var(--pos-soft);
+    color: var(--pos);
+  }
+  .sync.go {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .sync.off {
+    background: var(--neg-soft);
+    color: var(--neg);
+  }
+  .sync :global(svg) {
+    color: currentColor !important;
+  }
+  .spin {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .qerr {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-color: var(--neg);
+    background: color-mix(in srgb, var(--neg) 8%, var(--surface));
+  }
+  .qerr p {
+    margin: 4px 0 10px;
+    font-size: 14px;
+  }
+  .waiting {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 6px 12px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--r-l);
+    display: grid;
+    gap: 4px;
+  }
+  .waiting li {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 14px;
+  }
+  .waiting .chip {
+    display: grid;
+    place-items: center;
+    padding: 4px 6px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 800;
+    background: var(--surface-3);
+    color: var(--muted);
+  }
+  .waiting .muted {
+    font-size: 12.5px;
+  }
+
+  /* more options */
+  .more-wrap {
+    position: relative;
+  }
+  .menu {
+    position: absolute;
+    z-index: 35;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: min(320px, calc(100vw - 32px));
+    padding: 6px;
     display: grid;
     gap: 2px;
-    justify-items: start;
-    align-content: start;
-    padding: 10px 6px 8px 11px;
-    min-height: 62px;
-    border-radius: 15px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    cursor: pointer;
-    text-align: left;
-    position: relative;
-    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  @media (min-width: 900px) {
+    .menu {
+      top: calc(100% + 8px);
+      bottom: auto;
+    }
+  }
+  .menu > button,
+  .menu > a {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 10px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
     color: var(--ink);
-    transition: transform 90ms, background-color 140ms, border-color 140ms, opacity 140ms;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
   }
-  .res::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 11px;
-    bottom: 11px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: var(--faint);
+  .menu > button:hover,
+  .menu > a:hover {
+    background: var(--surface-2);
   }
-  .res.g-hit::before {
-    background: var(--pos);
+  .menu span {
+    display: grid;
+    gap: 2px;
   }
-  .res.g-onbase::before {
-    background: var(--accent);
-  }
-  .res:hover {
-    border-color: var(--line-strong);
-    background: var(--surface-3);
-  }
-  .res:active {
-    transform: scale(0.95);
-  }
-  .res[disabled] {
-    opacity: 0.3;
-    cursor: default;
-    transform: none;
-  }
-  .code {
-    font-weight: 800;
-    font-size: 21px;
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
-  .lbl {
-    font-size: 11px;
+  .menu small {
     color: var(--muted);
-    line-height: 1.15;
+    font-size: 12.5px;
   }
-  /* narrow phones: codes only, so the whole pad fits on one screen */
-  @media (max-width: 429px) {
-    .res {
-      min-height: 52px;
-      justify-items: center;
-      align-content: center;
-      padding: 8px 4px;
-    }
-    .code {
-      font-size: 22px;
-    }
-    .lbl {
-      position: absolute !important;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0 0 0 0);
-    }
+  .menu .confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .admin-back {
+    margin-bottom: -20px;
+  }
+  .fix-more {
+    margin: 14px 0 0;
+    font-size: 13.5px;
+  }
+  .linkbtn {
+    border: 0;
+    padding: 0;
+    background: none;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
   }
 
   .tools {
@@ -1304,11 +1589,7 @@
     gap: 8px;
     margin-top: 14px;
   }
-  .confirm {
-    display: inline-flex;
-    gap: 4px;
-  }
-  .danger {
+    .danger {
     background: var(--neg);
     border-color: var(--neg);
     color: #fff;

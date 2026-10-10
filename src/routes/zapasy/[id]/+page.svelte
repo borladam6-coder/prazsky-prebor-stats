@@ -127,6 +127,8 @@
 
   // ------------------------------------------------------------ entry
   const entryTeam = $derived(league.team(entryTeamId));
+  /** a team scored live is corrected in its play-by-play, not here (the database refuses it too) */
+  const entryLocked = $derived(live.some((s) => s.team_id === entryTeamId));
 
   const entryPlayers = $derived.by(() => {
     if (!entryTeamId) return [];
@@ -321,6 +323,16 @@
             {/each}
           </div>
 
+          {#if entryLocked}
+            <div class="locked card">
+              <Icon name="live" size={22} />
+              <div>
+                <strong>{entryTeam?.short_name ?? entryTeam?.name} má živý zápis</strong>
+                <p class="muted">Statistiky tohoto týmu vznikly ze živého zápisu. Opravují se v průběhu zápasu (tužkou u akce), aby seděly doběhy i pořadí.</p>
+                <a class="btn btn-primary btn-sm" href="/zapasy/{id}/zive?rezim=tym&tym={entryTeamId}"><Icon name="pencil" size={16} /> Opravit v živém zápisu</a>
+              </div>
+            </div>
+          {:else}
           <p class="hint muted">
             Klepni na hráče a zapisuj jeho příchody na pálku v pořadí, jak šly. Homerun automaticky přidá doběh i RBI.
             Ukradené mety a doběhy uprav tlačítky + a −.
@@ -407,6 +419,7 @@
               <button type="button" class="btn" onclick={() => (addOpen = true)}><Icon name="plus" size={18} /> Hráč, který není na soupisce</button>
             {/if}
           </div>
+          {/if}
         {/if}
       </div>
     {:else}
@@ -431,6 +444,21 @@
   }
   .back:hover {
     color: var(--ink);
+  }
+
+  .locked {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .locked :global(svg) {
+    color: var(--neg);
+  }
+  .locked p {
+    margin: 4px 0 12px;
+    font-size: 14px;
   }
 
   /* ---------- head */

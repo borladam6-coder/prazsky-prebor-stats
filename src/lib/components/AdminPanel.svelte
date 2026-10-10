@@ -1,6 +1,7 @@
 <script lang="ts">
   // "Správa zápasu": only for the administrator (unlocked with the admin code).
   // Manual final score and wiping all statistics of the game; both revertable by the admin.
+  import { untrack } from 'svelte';
   import { slide } from 'svelte/transition';
   import { admin } from '../admin.svelte.ts';
   import { league } from '../league.svelte.ts';
@@ -9,9 +10,13 @@
   import type { Game } from '../types.ts';
   import Icon from './Icon.svelte';
 
-  let { game, onchanged }: { game: Game; onchanged: () => void } = $props();
+  let {
+    game,
+    onchanged,
+    startOpen = false
+  }: { game: Game; onchanged: () => void; /** show the code form right away */ startOpen?: boolean } = $props();
 
-  let open = $state(false);
+  let open = $state(untrack(() => startOpen));
   let code = $state('');
   let unlockMsg = $state<string | null>(null);
   let busy = $state(false);
