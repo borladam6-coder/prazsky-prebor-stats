@@ -452,9 +452,7 @@
     gap: 8px;
     padding: 10px;
     border-radius: 20px;
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--surface) 97%, transparent);
     border: 1px solid var(--line);
     z-index: 5;
   }

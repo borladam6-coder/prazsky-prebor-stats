@@ -20,6 +20,7 @@
   import type { GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance } from '#lib/types.ts';
   import type { PlayItem } from '#lib/plays.ts';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
+  import Skeleton from '#lib/components/Skeleton.svelte';
   import Diamond from '#lib/components/Diamond.svelte';
   import PlaySheet from '#lib/components/PlaySheet.svelte';
   import LineupEditor from '#lib/components/LineupEditor.svelte';
@@ -585,7 +586,7 @@
     {#if loadError}
       <p class="empty">{loadError}</p>
     {:else if !loaded}
-      <p class="muted">Načítám…</p>
+      <Skeleton rows={3} height={110} />
     {:else if !open}
       <p class="empty">Živý zápis se otevře 2 hodiny před začátkem zápasu{game.starts_at ? ` (začátek v ${time(game.starts_at)})` : ''}.</p>
     {:else if scoring === null}
@@ -1416,9 +1417,7 @@
       z-index: 31;
       margin: 0;
       padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
-      background: color-mix(in srgb, var(--bg) 92%, transparent);
-      backdrop-filter: saturate(1.4) blur(14px);
-      -webkit-backdrop-filter: saturate(1.4) blur(14px);
+      background: color-mix(in srgb, var(--bg) 97%, transparent);
       border-top: 1px solid var(--line);
       box-shadow: 0 -8px 24px rgb(0 0 0 / 0.08);
     }

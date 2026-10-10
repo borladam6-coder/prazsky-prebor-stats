@@ -4,6 +4,19 @@
 import { supabase, configProblem } from './supabase.ts';
 import type { Game, Player, Season, Standing, Team } from './types.ts';
 
+/** Last loaded reference data, shown at once on the next visit while fresh data loads. */
+const CACHE_KEY = 'pps.league.v1';
+const CACHE_MAX_AGE = 7 * 24 * 3600_000;
+
+interface Cached {
+  at: number;
+  season: Season;
+  teams: Team[];
+  players: Player[];
+  games: Game[];
+  standings: Standing[];
+}
+
 const PLAYER_COLS = 'id, season_id, team_id, name, jersey_number, source, active, version';
 const GAME_COLS = 'id, season_id, game_number, starts_at, status, home_team_id, away_team_id, home_score, away_score, venue';
 
@@ -24,14 +37,56 @@ class League {
 
   private pending: Promise<void> | null = null;
 
-  /** Loads everything once; later calls reuse the same promise. */
+  /**
+   * Loads everything once; later calls reuse the same promise. With data from the last
+   * visit the site starts at once and the fresh data replaces it a moment later.
+   */
   ensure(): Promise<void> {
     if (this.status === 'ready') return Promise.resolve();
+    if (this.status === 'idle' && this.restore()) {
+      this.status = 'ready';
+      this.pending = this.load(true).catch(() => {});
+      return Promise.resolve();
+    }
     return (this.pending ??= this.load());
   }
 
-  async load(): Promise<void> {
-    this.status = 'loading';
+  private restore(): boolean {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return false;
+      const c = JSON.parse(raw) as Cached;
+      if (!c.season || Date.now() - c.at > CACHE_MAX_AGE) return false;
+      this.season = c.season;
+      this.teams = c.teams;
+      this.players = c.players;
+      this.games = c.games;
+      this.standings = c.standings;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private save() {
+    try {
+      const c: Cached = {
+        at: Date.now(),
+        season: $state.snapshot(this.season)!,
+        teams: $state.snapshot(this.teams),
+        players: $state.snapshot(this.players),
+        games: $state.snapshot(this.games),
+        standings: $state.snapshot(this.standings)
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(c));
+    } catch {
+      /* storage full or blocked: no cache, fine */
+    }
+  }
+
+  /** `background`: data from the cache is already shown, a failure keeps it. */
+  async load(background = false): Promise<void> {
+    if (!background) this.status = 'loading';
     try {
       if (!supabase) throw new Error(configMessage());
       const { data: season, error } = await supabase
@@ -45,7 +100,9 @@ class League {
       await Promise.all([this.loadTeams(), this.loadPlayers(), this.loadGames(), this.loadStandings()]);
       this.status = 'ready';
       this.error = null;
+      this.save();
     } catch (e) {
+      if (background) throw e;
       this.status = 'error';
       this.error = e instanceof Error ? e.message : String(e);
       this.pending = null;
@@ -76,18 +133,18 @@ class League {
   }
 
   async loadGames() {
-    const { data, error } = await supabase!
-      .from('games')
-      .select(GAME_COLS)
-      .eq('season_id', this.season!.id)
-      .order('starts_at', { ascending: true, nullsFirst: false });
+    // games and the administrator's manual scores in parallel (one round trip less)
+    const [{ data, error }, { data: overrides }] = await Promise.all([
+      supabase!
+        .from('games')
+        .select(GAME_COLS)
+        .eq('season_id', this.season!.id)
+        .order('starts_at', { ascending: true, nullsFirst: false }),
+      supabase!.from('game_score_overrides').select('game_id, home_score, away_score').not('home_score', 'is', null)
+    ]);
     if (error) throw error;
     const games = (data ?? []) as Game[];
     // manual final score set by the administrator wins over the imported one
-    const { data: overrides } = await supabase!
-      .from('game_score_overrides')
-      .select('game_id, home_score, away_score')
-      .not('home_score', 'is', null);
     const byGame = new Map((overrides ?? []).map((o) => [o.game_id as number, o]));
     this.games = games.map((g) => {
       const o = byGame.get(g.id);

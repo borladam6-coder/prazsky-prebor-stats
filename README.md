@@ -12,6 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 9: menu bez Historie (je v patičce a v detailu zápasu), přehled na jeden pohled (živě, další zápas, poslední výsledky, top 3 pálkaři, tabulka), hledání hráčů a týmů (lupa nebo klávesa /), na telefonu tabulky jen s hlavními sloupci (přepínač Všechny statistiky), šedé obrysy při načítání, instalace jako aplikace, rychlejší start (data z minulé návštěvy hned, čerstvá chvíli poté).
 - Krok 8: zápis bez signálu (akce čekají v telefonu), výsledková tlačítka dole pod palcem, rychlejší sestava (přetažení, pořadí z minulého zápasu), Další možnosti, nápověda, ruční zápis zamčený u týmu se živým zápisem.
 
 ## Živý zápis
@@ -49,6 +50,8 @@ netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
 src/routes/                        stránky: přehled, zápasy, týmy, hráči, historie
 src/lib/                           data, formátování, logika živého zápisu (live.ts), komponenty
 tests/                             automatické testy databáze a importu
+static/manifest.webmanifest, static/icons/  instalace jako aplikace (ikona na ploše)
+static/sw.js                       service worker: stránka jde otevřít i bez signálu, stránky vždy čerstvé ze sítě
 netlify.toml                       nastavení buildu, přesměrování, bezpečnostní hlavičky
 .env.example                       vzor proměnných prostředí
 ```

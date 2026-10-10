@@ -8,6 +8,7 @@
   import { rate, num, day } from '#lib/format.ts';
   import type { PlayerGameLine, PlayerTotals } from '#lib/types.ts';
   import StatTable from '#lib/components/StatTable.svelte';
+  import Skeleton from '#lib/components/Skeleton.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Icon from '#lib/components/Icon.svelte';
 
@@ -66,7 +67,7 @@
     {#if error}
       <p class="empty">{error}</p>
     {:else if log === null}
-      <p class="muted">Načítám…</p>
+      <Skeleton rows={6} height={44} card />
     {:else if !season}
       <div class="empty">
         <p>Hráč zatím nemá zapsané žádné statistiky.</p>
@@ -98,6 +99,7 @@
           rowKey={(r) => r.game_id}
           {columns}
           nameLabel="Zápas"
+          essential={['pa', 'ab', 'h', 'hr', 'rbi', 'r', 'bb']}
           caption="Statistiky po zápasech"
           totals={{ label: 'Sezóna', row: season as unknown as PlayerGameLine }}
         >

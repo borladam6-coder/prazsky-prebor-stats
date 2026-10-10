@@ -11,6 +11,7 @@
   import { toasts } from '#lib/toast.svelte.ts';
   import type { Player, PlayerTotals, TeamTotals } from '#lib/types.ts';
   import StatTable from '#lib/components/StatTable.svelte';
+  import Skeleton from '#lib/components/Skeleton.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import GameCard from '#lib/components/GameCard.svelte';
   import Filters from '#lib/components/Filters.svelte';
@@ -165,7 +166,7 @@
         {#if statsError}
           <p class="empty">{statsError}</p>
         {:else if rows === null}
-          <p class="muted">Načítám…</p>
+          <Skeleton rows={8} height={40} card />
         {:else}
           <StatTable
             {rows}
