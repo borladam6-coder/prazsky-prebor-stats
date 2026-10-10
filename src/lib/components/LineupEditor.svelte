@@ -1,15 +1,17 @@
 <script lang="ts">
-  // Batting order: tap players from the roster, reorder, replace (substitution), add a new player.
-  import { untrack } from 'svelte';
+  // Batting order: tap players from the roster, drag to reorder, replace (substitution),
+  // add a new player, or start from the order of the team's previous game.
+  import { untrack, onMount, tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { slide } from 'svelte/transition';
   import { league } from '../league.svelte.ts';
-  import { addPlayer, errorMessage, WriteCancelled } from '../api.ts';
+  import { addPlayer, errorMessage, previousLineup, WriteCancelled } from '../api.ts';
   import { toasts } from '../toast.svelte.ts';
   import Icon from './Icon.svelte';
 
   let {
     teamId,
+    gameId = null,
     initial = [],
     nextSlot = null,
     saveLabel,
@@ -18,6 +20,8 @@
     oncancel = undefined
   }: {
     teamId: number;
+    /** current game: offers the batting order of the previous game */
+    gameId?: number | null;
     initial?: string[];
     /** index of the batter who is up next (shown when editing a running game) */
     nextSlot?: number | null;
@@ -48,14 +52,72 @@
     }
   }
 
-  function move(i: number, d: -1 | 1) {
-    const j = i + d;
-    if (j < 0 || j >= order.length) return;
+  /** moves the player at `from` to position `to`; the batter who is up stays the same person */
+  function moveTo(from: number, to: number) {
+    if (from === to || to < 0 || to >= order.length) return;
+    const upId = up !== null ? order[up] : null;
     const next = [...order];
-    [next[i], next[j]] = [next[j], next[i]];
+    const [id] = next.splice(from, 1);
+    next.splice(to, 0, id);
     order = next;
-    if (up === i) up = j;
-    else if (up === j) up = i;
+    if (upId) up = next.indexOf(upId);
+  }
+
+  // ------------------------------------------------ drag & drop by the grip
+  let listEl = $state<HTMLOListElement>();
+  let dragging = $state<number | null>(null);
+
+  function gripDown(e: PointerEvent, i: number) {
+    e.preventDefault();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    dragging = i;
+  }
+
+  function gripMove(e: PointerEvent) {
+    if (dragging === null || !listEl) return;
+    const items = [...listEl.children] as HTMLElement[];
+    let target = items.length - 1;
+    for (let k = 0; k < items.length; k++) {
+      const r = items[k].getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) {
+        target = k;
+        break;
+      }
+    }
+    if (target !== dragging) {
+      moveTo(dragging, target);
+      dragging = target;
+    }
+  }
+
+  const gripUp = () => (dragging = null);
+
+  function gripKey(e: KeyboardEvent, i: number) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const to = i + (e.key === 'ArrowUp' ? -1 : 1);
+    moveTo(i, to);
+    tick().then(() => (listEl?.children[to]?.querySelector('.grip') as HTMLElement | null)?.focus());
+  }
+
+  // ------------------------------------------------ previous game
+  let previous = $state<string[] | null>(null);
+  onMount(async () => {
+    if (!gameId || initial.length) return;
+    try {
+      previous = await previousLineup(teamId, league.game(gameId)?.starts_at ?? null, gameId);
+    } catch {
+      previous = null;
+    }
+  });
+
+  // substitution: show the bench (on a phone it is below the order)
+  let benchEl = $state<HTMLElement>();
+  function startReplace(i: number) {
+    replacing = replacing === i ? null : i;
+    if (replacing !== null && window.matchMedia('(max-width: 859px)').matches) {
+      tick().then(() => benchEl?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
   }
 
   function remove(i: number) {
@@ -106,11 +168,27 @@
 
     {#if order.length === 0}
       <p class="hint muted">Klepni na hráče ze soupisky v pořadí, v jakém půjdou na pálku.</p>
+      {#if previous}
+        <button type="button" class="btn btn-primary prev" onclick={() => (order = [...previous!])}>
+          <Icon name="copy" size={18} /> Pořadí z minulého zápasu ({previous.length})
+        </button>
+      {/if}
     {:else}
-      <ol>
+      <p class="hint muted drag-hint">Pořadí změníš přetažením za úchyt <Icon name="grip" size={14} />.</p>
+      <ol bind:this={listEl}>
         {#each order as id, i (id)}
           {@const p = player(id)}
-          <li animate:flip={{ duration: 180 }} class:replacing={replacing === i} class:up={up === i}>
+          <li animate:flip={{ duration: dragging === null ? 180 : 120 }} class:replacing={replacing === i} class:up={up === i} class:dragging={dragging === i}>
+            <button
+              type="button"
+              class="grip"
+              aria-label="Přesunout {p?.name} (šipkami nahoru a dolů)"
+              onpointerdown={(e) => gripDown(e, i)}
+              onpointermove={gripMove}
+              onpointerup={gripUp}
+              onpointercancel={gripUp}
+              onkeydown={(e) => gripKey(e, i)}
+            ><Icon name="grip" size={18} /></button>
             <span class="slot">{i + 1}</span>
             <span class="jn">{p?.jersey_number ?? '–'}</span>
             <span class="pn">
@@ -121,9 +199,7 @@
               {#if nextSlot !== null && up !== i}
                 <button type="button" title="Tento hráč jde teď na pálku" aria-label="{p?.name} jde teď na pálku" onclick={() => (up = i)}><Icon name="player" size={17} /></button>
               {/if}
-              <button type="button" aria-label="Posunout {p?.name} výš" disabled={i === 0} onclick={() => move(i, -1)}><Icon name="up" size={18} /></button>
-              <button type="button" aria-label="Posunout {p?.name} níž" disabled={i === order.length - 1} onclick={() => move(i, 1)}><Icon name="down" size={18} /></button>
-              <button type="button" aria-label="Vystřídat {p?.name}" aria-pressed={replacing === i} onclick={() => (replacing = replacing === i ? null : i)}><Icon name="swap" size={17} /></button>
+              <button type="button" aria-label="Vystřídat {p?.name}" title="Vystřídat" aria-pressed={replacing === i} onclick={() => startReplace(i)}><Icon name="swap" size={17} /></button>
               <button type="button" class="rm" aria-label="Odebrat {p?.name}" onclick={() => remove(i)}><Icon name="close" size={17} /></button>
             </span>
           </li>
@@ -132,7 +208,7 @@
     {/if}
   </section>
 
-  <section class="card bench">
+  <section class="card bench" bind:this={benchEl}>
     <header>
       <h2>{replacing !== null ? `Kdo nahradí: ${player(order[replacing])?.name ?? ''}` : 'Soupiska'}</h2>
       {#if replacing !== null}<button type="button" class="btn btn-quiet btn-sm" onclick={() => (replacing = null)}>Zrušit střídání</button>{/if}
@@ -219,13 +295,51 @@
   }
   ol li {
     display: grid;
-    grid-template-columns: 22px 32px minmax(0, 1fr) auto;
+    grid-template-columns: 30px 20px 32px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
-    padding: 6px 6px 6px 8px;
+    gap: 6px;
+    padding: 4px 4px 4px 2px;
     border-radius: 14px;
     background: var(--surface-2);
     border: 1px solid transparent;
+  }
+  ol li.dragging {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow);
+    background: var(--surface);
+    z-index: 2;
+    position: relative;
+  }
+  .grip {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--faint);
+    cursor: grab;
+    touch-action: none;
+  }
+  .grip:hover,
+  .grip:focus-visible {
+    color: var(--ink);
+    background: var(--surface-3);
+  }
+  li.dragging .grip {
+    cursor: grabbing;
+    color: var(--accent-text);
+  }
+  .drag-hint {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: -4px;
+    font-size: 13px;
+  }
+  .prev {
+    margin: 6px 6px 10px;
   }
   ol li.up {
     border-color: var(--accent);
@@ -281,10 +395,6 @@
   .tools button:hover {
     background: var(--surface-3);
     color: var(--ink);
-  }
-  .tools button[disabled] {
-    opacity: 0.3;
-    cursor: default;
   }
   .tools button[aria-pressed='true'] {
     background: var(--accent);

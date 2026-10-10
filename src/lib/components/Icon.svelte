@@ -3,7 +3,7 @@
   type Name =
     | 'board' | 'calendar' | 'shield' | 'player' | 'history' | 'sun' | 'moon' | 'auto'
     | 'chevron' | 'back' | 'plus' | 'minus' | 'undo' | 'pencil' | 'close' | 'check' | 'search' | 'trash'
-    | 'live' | 'up' | 'down' | 'swap' | 'flag' | 'tune';
+    | 'live' | 'up' | 'down' | 'swap' | 'flag' | 'tune' | 'more' | 'help' | 'wifi-off' | 'grip' | 'copy';
 
   let { name, size = 20 }: { name: Name; size?: number } = $props();
 </script>
@@ -55,6 +55,16 @@
     <path d="M7 4L4 7l3 3M4 7h12M17 20l3-3-3-3M20 17H8" />
   {:else if name === 'flag'}
     <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+  {:else if name === 'more'}
+    <circle cx="5.5" cy="12" r="1.3" fill="currentColor" /><circle cx="12" cy="12" r="1.3" fill="currentColor" /><circle cx="18.5" cy="12" r="1.3" fill="currentColor" />
+  {:else if name === 'help'}
+    <circle cx="12" cy="12" r="8.5" /><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.5" /><circle cx="12" cy="16.8" r=".6" fill="currentColor" />
+  {:else if name === 'wifi-off'}
+    <path d="M3 3l18 18M8.5 16.4a5 5 0 0 1 6.2-.6M5.2 13a9.6 9.6 0 0 1 5-2.6M2 9.6a14 14 0 0 1 4.3-2.7M12 5.5a14 14 0 0 1 10 4.1M16.5 10.6a9.7 9.7 0 0 1 2.3 2.4" /><circle cx="12" cy="19.5" r=".7" fill="currentColor" />
+  {:else if name === 'grip'}
+    <circle cx="9" cy="7" r="1.2" fill="currentColor" /><circle cx="15" cy="7" r="1.2" fill="currentColor" /><circle cx="9" cy="12" r="1.2" fill="currentColor" /><circle cx="15" cy="12" r="1.2" fill="currentColor" /><circle cx="9" cy="17" r="1.2" fill="currentColor" /><circle cx="15" cy="17" r="1.2" fill="currentColor" />
+  {:else if name === 'copy'}
+    <rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
   {:else if name === 'tune'}
     <path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" />
   {/if}
