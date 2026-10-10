@@ -14,6 +14,8 @@
   import { flip } from 'svelte/animate';
   import { compareStat } from '../stats.ts';
   import { rate as fmtRate, num } from '../format.ts';
+  import { tablePrefs } from '../tableprefs.svelte.ts';
+  import Icon from './Icon.svelte';
 
   interface Props {
     rows: T[];
@@ -29,6 +31,8 @@
     caption?: string;
     empty?: string;
     onsort?: (key: string, dir: 1 | -1) => void;
+    /** columns shown on a phone unless "Všechny statistiky" is on */
+    essential?: string[];
   }
 
   let {
@@ -43,8 +47,15 @@
     totals = null,
     caption,
     empty = 'Nic k zobrazení.',
-    onsort
+    onsort,
+    essential = ['pa', 'h', 'hr', 'rbi', 'avg', 'ops']
   }: Props = $props();
+
+  // phone: key columns only (plus the one the table is sorted by)
+  const reducible = $derived(tablePrefs.narrow && columns.filter((c) => essential.includes(c.key)).length < columns.length);
+  const visible = $derived(
+    reducible && !tablePrefs.all ? columns.filter((c) => essential.includes(c.key) || c.key === sortKey) : columns
+  );
 
   const sorted = $derived.by(() => {
     if (sortKey === '__name' && nameSort) {
@@ -77,6 +88,14 @@
 {#if rows.length === 0}
   <p class="empty">{empty}</p>
 {:else}
+  {#if reducible}
+    <div class="cols">
+      <button type="button" class="btn btn-quiet btn-sm" aria-pressed={tablePrefs.all} onclick={() => tablePrefs.toggle()}>
+        <Icon name="tune" size={16} />
+        {tablePrefs.all ? 'Jen hlavní statistiky' : `Všechny statistiky (${columns.length})`}
+      </button>
+    </div>
+  {/if}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard-reachable) -->
   <div class="wrap" role="region" aria-label={caption ?? nameLabel} tabindex="0">
     <table>
@@ -90,7 +109,7 @@
               {nameLabel}
             {/if}
           </th>
-          {#each columns as c (c.key)}
+          {#each visible as c (c.key)}
             <th scope="col" aria-sort={ariaSort(c.key)} class:active={sortKey === c.key} class:rate={c.kind === 'rate'}>
               <button type="button" title={c.title} onclick={() => sortBy(c.key, c.lowerIsBetter)}>
                 {c.label}
@@ -104,7 +123,7 @@
         {#each sorted as row (rowKey(row))}
           <tr animate:flip={{ duration: 280 }}>
             <th scope="row" class="name">{@render name(row)}</th>
-            {#each columns as c (c.key)}
+            {#each visible as c (c.key)}
               <td class:active={sortKey === c.key} class:rate={c.kind === 'rate'}>{show(c, row)}</td>
             {/each}
           </tr>
@@ -114,7 +133,7 @@
         <tfoot>
           <tr>
             <th scope="row" class="name">{totals.label}</th>
-            {#each columns as c (c.key)}
+            {#each visible as c (c.key)}
               <td class:rate={c.kind === 'rate'}>{show(c, totals.row)}</td>
             {/each}
           </tr>
@@ -125,6 +144,11 @@
 {/if}
 
 <style>
+  .cols {
+    display: flex;
+    justify-content: flex-end;
+    margin: -4px 0 6px;
+  }
   .wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;

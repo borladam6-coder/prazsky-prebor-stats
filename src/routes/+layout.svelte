@@ -9,18 +9,25 @@
   import Icon from '#lib/components/Icon.svelte';
   import NicknameDialog from '#lib/components/NicknameDialog.svelte';
   import Toasts from '#lib/components/Toasts.svelte';
+  import Search from '#lib/components/Search.svelte';
 
   let { children, data }: LayoutProps = $props();
 
-  onMount(() => theme.init());
+  onMount(() => {
+    theme.init();
+    // app shell offline + installable app (see static/sw.js)
+    if ('serviceWorker' in navigator && !import.meta.env.DEV) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
 
+  // History of changes is in the footer and in each game, not in the main menu.
   const nav = [
     { href: '/', label: 'Přehled', icon: 'board' },
     { href: '/zapasy', label: 'Zápasy', icon: 'calendar' },
     { href: '/tymy', label: 'Týmy', icon: 'shield' },
-    { href: '/hraci', label: 'Hráči', icon: 'player' },
-    { href: '/historie', label: 'Historie', icon: 'history' }
+    { href: '/hraci', label: 'Hráči', icon: 'player' }
   ] as const;
+
+  let searchOpen = $state(false);
 
   const isActive = (href: string) =>
     href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
@@ -30,8 +37,25 @@
   );
 </script>
 
+<svelte:window
+  onkeydown={(e) => {
+    const t = e.target as HTMLElement | null;
+    const typing = t?.closest?.('input, textarea, select, [contenteditable]');
+    if (e.key === '/' && !typing && !searchOpen) {
+      e.preventDefault();
+      searchOpen = true;
+    }
+  }}
+/>
+
 <svelte:head>
   <link rel="icon" href={favicon} />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Přebor" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#0a0b0a" />
   <meta name="description" content="Komunitní pálkařské statistiky Pražského přeboru mužů v softballu." />
 </svelte:head>
@@ -52,6 +76,9 @@
       {/each}
     </nav>
 
+    <button type="button" class="theme" onclick={() => (searchOpen = true)} aria-label="Hledat hráče nebo tým" title="Hledat (/)">
+      <Icon name="search" size={19} />
+    </button>
     <button type="button" class="theme" onclick={() => theme.toggle()} aria-label={themeLabel} title={themeLabel}>
       <Icon name={theme.mode === 'system' ? 'auto' : theme.mode === 'light' ? 'sun' : 'moon'} size={19} />
     </button>
@@ -90,6 +117,7 @@
   {/each}
 </nav>
 
+{#if searchOpen}<Search onclose={() => (searchOpen = false)} />{/if}
 <NicknameDialog />
 <Toasts />
 
@@ -114,9 +142,8 @@
     top: 0;
     z-index: 20;
     padding-top: env(safe-area-inset-top);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: saturate(1.4) blur(14px);
-    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    /* phones: solid background, a blur behind a sticky bar makes scrolling stutter */
+    background: color-mix(in srgb, var(--bg) 97%, transparent);
     border-bottom: 1px solid var(--line);
   }
   .top {
@@ -206,11 +233,9 @@
     bottom: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     padding-bottom: env(safe-area-inset-bottom);
-    background: color-mix(in srgb, var(--surface) 90%, transparent);
-    backdrop-filter: saturate(1.4) blur(14px);
-    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    background: color-mix(in srgb, var(--surface) 97%, transparent);
     border-top: 1px solid var(--line);
   }
   .nav-mobile a {

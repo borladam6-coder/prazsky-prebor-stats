@@ -14,6 +14,7 @@
   import { toasts } from '#lib/toast.svelte.ts';
   import type { GameExtras, LiveSession, PaResult, PlateAppearance, Player, PlayerGameLine, Team } from '#lib/types.ts';
   import LiveCard from '#lib/components/LiveCard.svelte';
+  import Skeleton from '#lib/components/Skeleton.svelte';
   import AdminPanel from '#lib/components/AdminPanel.svelte';
   import StatTable from '#lib/components/StatTable.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
@@ -274,7 +275,7 @@
     {#if loadError}
       <p class="empty">{loadError}</p>
     {:else if !loaded}
-      <p class="muted loading">Načítám…</p>
+      <Skeleton rows={8} height={40} card />
     {:else if tab === 'box'}
       <div in:fade={{ duration: 150 }}>
         {#each boxes as b (b.team.id)}
@@ -292,6 +293,7 @@
                 rows={b.rows}
                 rowKey={(r) => r.player_id}
                 columns={boxColumns}
+                essential={['pa', 'ab', 'h', 'hr', 'rbi', 'r', 'bb']}
                 nameLabel="Hráč"
                 nameSort={(r) => league.player(r.player_id)?.name ?? ''}
                 sortKey="pa"
@@ -556,9 +558,6 @@
   .tabs {
     margin: 18px 0 20px;
     max-width: 520px;
-  }
-  .loading {
-    padding: 20px 0;
   }
 
   /* ---------- box score */

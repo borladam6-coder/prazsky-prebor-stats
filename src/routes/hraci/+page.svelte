@@ -8,6 +8,7 @@
   import type { PlayerTotals } from '#lib/types.ts';
   import { plural } from '#lib/format.ts';
   import StatTable from '#lib/components/StatTable.svelte';
+  import Skeleton from '#lib/components/Skeleton.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Filters from '#lib/components/Filters.svelte';
   import Icon from '#lib/components/Icon.svelte';
@@ -68,7 +69,7 @@
   {#if error}
     <p class="empty">{error}</p>
   {:else if rows === null}
-    <p class="muted">Načítám…</p>
+    <Skeleton rows={10} height={40} card />
   {:else}
     <p class="count muted">{shown.length} {plural(shown.length, ['hráč', 'hráči', 'hráčů'])}</p>
     <StatTable
