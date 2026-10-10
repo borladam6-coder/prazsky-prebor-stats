@@ -3,12 +3,13 @@
 
 import { supabase } from './supabase.ts';
 import { identity } from './identity.svelte.ts';
+import { admin } from './admin.svelte.ts';
 import type {
   ChangeEntry, ChangeGroup, GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance, Player,
   PlayerGameLine, PlayerTotals, TeamGameLine, TeamTotals
 } from './types.ts';
 import type { Play } from './live.ts';
-import { buildPlays, type LogEntry, type LogGroup, type PlayItem } from './plays.ts';
+import { buildPlays, type CurrentPas, type LogEntry, type LogGroup, type PlayItem } from './plays.ts';
 
 export class WriteCancelled extends Error {}
 
@@ -145,16 +146,20 @@ export async function gameRuns(gameId: number): Promise<Map<number, number>> {
 }
 
 /** Play-by-play of the live scoring of one game (from the change history). */
-export async function gamePlayLog(gameId: number): Promise<PlayItem[]> {
+export async function gamePlayLog(gameId: number, pas: PlateAppearance[] = []): Promise<PlayItem[]> {
   const { data: entries, error } = await db()
     .from('change_log')
     .select('id, group_id, table_name, action, old_data, new_data, is_derived')
     .eq('game_id', gameId)
-    .in('table_name', ['live_sessions', 'plate_appearances', 'game_player_extras'])
+    .in('table_name', ['live_sessions', 'plate_appearances', 'game_player_extras', 'live_run_adjustments'])
     .order('id')
-    .limit(3000);
+    .limit(5000);
   if (error) throw error;
-  const live = new Set((entries ?? []).filter((e) => e.table_name === 'live_sessions').map((e) => e.group_id as string));
+  const live = new Set(
+    (entries ?? [])
+      .filter((e) => e.table_name === 'live_sessions' || e.table_name === 'live_run_adjustments')
+      .map((e) => e.group_id as string)
+  );
   const ids = [...live];
   const groups: LogGroup[] = [];
   for (let i = 0; i < ids.length; i += 80) {
@@ -165,7 +170,8 @@ export async function gamePlayLog(gameId: number): Promise<PlayItem[]> {
     if (e2) throw e2;
     groups.push(...((data ?? []) as LogGroup[]));
   }
-  return buildPlays(groups, ((entries ?? []) as LogEntry[]).filter((e) => live.has(e.group_id)));
+  const current: CurrentPas = new Map(pas.map((p) => [p.id, { result: p.result, rbi: p.rbi, deleted: !!p.deleted_at }]));
+  return buildPlays(groups, ((entries ?? []) as LogEntry[]).filter((e) => live.has(e.group_id)), current);
 }
 
 export interface HistoryPage {
@@ -301,3 +307,38 @@ export const livePlay = (s: LiveSession, play: Play) =>
 /** Undo the last play of this team, or with `wholeGame` the last play of the game (both teams scored). */
 export const liveUndo = (s: LiveSession, wholeGame = false) =>
   call<LiveSession>('live_undo', { p_game_id: s.game_id, p_team_id: wholeGame ? null : s.team_id });
+
+// ------------------------------------------------------------------ corrections of live scoring
+
+export const liveDeletePlay = (gameId: number, groupId: string) =>
+  call<string>('live_delete_play', { p_game_id: gameId, p_group_id: groupId });
+
+/** Back to the state right after this play; returns the number of reverted plays. */
+export const liveRewind = (gameId: number, groupId: string) =>
+  call<number>('live_rewind', { p_game_id: gameId, p_group_id: groupId });
+
+export const liveAdjustRuns = (gameId: number, teamId: number, inning: number, playerId: string, delta: 1 | -1) =>
+  call('live_adjust_runs', {
+    p_game_id: gameId, p_team_id: teamId, p_inning: inning, p_player_id: playerId, p_delta: delta
+  });
+
+// ------------------------------------------------------------------ administrator
+
+async function adminCall<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  if (!admin.code) throw new Error('Nejdřív odemkni správu kódem správce.');
+  try {
+    return await call<T>(fn, { ...args, p_code: admin.code });
+  } catch (e) {
+    if (/Nesprávný kód správce/.test(errorMessage(e))) admin.forget();
+    throw e;
+  }
+}
+
+export const adminResetGame = (gameId: number) => adminCall<string>('admin_reset_game', { p_game_id: gameId });
+
+export const adminSetScore = (gameId: number, home: number | null, away: number | null) =>
+  adminCall('admin_set_score', { p_game_id: gameId, p_home_score: home, p_away_score: away });
+
+export const adminRevertGroup = (groupId: string) => adminCall<string>('admin_revert_group', { p_group_id: groupId });
+
+export const adminChangeCode = (newCode: string) => adminCall<boolean>('admin_change_code', { p_new_code: newCode });

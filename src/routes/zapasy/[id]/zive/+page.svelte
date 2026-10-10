@@ -8,6 +8,7 @@
   import { supabase } from '#lib/supabase.ts';
   import {
     liveOfGame, gameEntries, liveStart, liveSetLineup, liveSetState, liveFinish, livePlay, liveUndo,
+    gamePlayLog, liveDeletePlay, liveRewind, liveAdjustRuns, updatePlateAppearance, revertGroup,
     errorMessage, WriteCancelled
   } from '#lib/api.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
@@ -16,11 +17,13 @@
   import { plural, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
   import type { GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance } from '#lib/types.ts';
+  import type { PlayItem } from '#lib/plays.ts';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Diamond from '#lib/components/Diamond.svelte';
   import PlaySheet from '#lib/components/PlaySheet.svelte';
   import LineupEditor from '#lib/components/LineupEditor.svelte';
-  import HistoryList from '#lib/components/HistoryList.svelte';
+  import PlayLog from '#lib/components/PlayLog.svelte';
+  import EditPlaySheet from '#lib/components/EditPlaySheet.svelte';
   import Icon from '#lib/components/Icon.svelte';
 
   const id = $derived(Number(page.params.id));
@@ -52,10 +55,13 @@
   /** short summary of the last saved play, shown on the scoreboard (toasts would cover the pad) */
   let lastPlay = $state<string | null>(null);
   let historyList = $state<{ reload: () => Promise<void> }>();
+  let plays = $state<PlayItem[]>([]);
+  let editing = $state<PlayItem | null>(null);
 
   async function load() {
     try {
       const [l, e] = await Promise.all([liveOfGame(id), gameEntries(id)]);
+      plays = await gamePlayLog(id, e.pas);
       sessions = l.sessions;
       lineups = l.lineups;
       pas = e.pas;
@@ -90,6 +96,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_lineups', filter }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plate_appearances', filter }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_player_extras', filter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_run_adjustments', filter }, refresh)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -308,6 +315,54 @@
       lastPlay = 'Stav opraven.';
     });
 
+  // ------------------------------------------------------------ corrections of earlier plays
+  const editingPa = $derived(editing?.paId ? (pas.find((p) => p.id === editing!.paId) ?? null) : null);
+  const latestPlayId = $derived([...plays].reverse().find((p) => p.kind === 'play')?.id ?? null);
+  const closeEdit = () => (editing = null);
+
+  const saveResult = (pa: PlateAppearance, result: PaResult, rbi: number) =>
+    run(() => updatePlateAppearance(pa, { result, rbi }), () => {
+      lastPlay = 'Výsledek akce opraven.';
+      closeEdit();
+    });
+
+  const adjust = (playerId: string, delta: 1 | -1) => {
+    const p = editing;
+    if (!p) return;
+    run(() => liveAdjustRuns(id, p.teamId, p.inning, playerId, delta), () => {
+      lastPlay = `Doběh ${delta > 0 ? 'přidán' : 'odebrán'} (${p.inning}. směna).`;
+      closeEdit();
+    });
+  };
+
+  const deletePlay = () => {
+    const p = editing;
+    if (!p) return;
+    run(() => liveDeletePlay(id, p.id), () => {
+      lastPlay = 'Akce smazána.';
+      closeEdit();
+    });
+  };
+
+  const rewind = () => {
+    const p = editing;
+    if (!p) return;
+    lastWasUndo = true;
+    run(() => liveRewind(id, p.id), (n) => {
+      lastPlay = `Zápis vrácen o ${n} ${plural(n, ['akci', 'akce', 'akcí'])}.`;
+      closeEdit();
+    });
+  };
+
+  const cancelAdjust = () => {
+    const p = editing;
+    if (!p) return;
+    run(() => revertGroup(p.id), () => {
+      lastPlay = 'Oprava zrušena.';
+      closeEdit();
+    });
+  };
+
   // every switch of the screen starts at the top (the lineup editor is long)
   $effect(() => {
     void mode;
@@ -402,6 +457,13 @@
           <button type="button" class="btn btn-primary" disabled={busy} onclick={() => finish(false)}>Pokračovat v zápisu</button>
         </div>
       </div>
+      {#if plays.length}
+        <section class="feed">
+          <div class="feed-head"><h2>Průběh zápasu</h2></div>
+          <p class="muted feed-hint">I po skončení jde u každé akce opravit výsledek nebo doběhy, případně akci smazat.</p>
+          <PlayLog {plays} awayTeamId={game.away_team_id} onedit={(p) => (editing = p)} />
+        </section>
+      {/if}
     {:else if mode === 'lineup'}
       <!-- ---------------------------------------------------------- lineup edit -->
       <div class="teamline"><TeamBadge {team} size={30} /><strong>{team.name}</strong></div>
@@ -544,12 +606,33 @@
       {/if}
 
       <section class="feed">
-        <h2>Poslední akce</h2>
-        <HistoryList bind:this={historyList} gameId={id} limit={8} onreverted={load} />
+        <div class="feed-head">
+          <h2>Průběh zápasu</h2>
+          <a class="link-accent" href="/zapasy/{id}?historie">Historie změn</a>
+        </div>
+        <p class="muted feed-hint">Tužkou u akce opravíš výsledek, doběhy ve směně, akci smažeš nebo k ní vrátíš celý zápis.</p>
+        <PlayLog {plays} awayTeamId={game.away_team_id} onedit={(p) => (editing = p)} />
       </section>
     {/if}
   {/if}
 </div>
+
+{#if editing}
+  <EditPlaySheet
+    play={editing}
+    pa={editingPa}
+    awayTeamId={game?.away_team_id}
+    isLatest={editing.id === latestPlayId}
+    canRewind={sessions.length > 0 && !sessions.some((x) => x.finished)}
+    {busy}
+    onsaveresult={saveResult}
+    onadjust={adjust}
+    ondelete={deletePlay}
+    onrewind={rewind}
+    oncanceladjust={cancelAdjust}
+    onclose={closeEdit}
+  />
+{/if}
 
 {#if sheet && session && !session.finished}
   <PlaySheet
@@ -1033,9 +1116,18 @@
   .feed {
     margin-top: 32px;
   }
+  .feed-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .feed h2 {
-    margin-bottom: 12px;
     font-size: 20px;
+  }
+  .feed-hint {
+    margin: 6px 0 12px;
+    font-size: 13.5px;
   }
 
   @media (min-width: 900px) {
