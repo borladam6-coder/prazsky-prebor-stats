@@ -13,8 +13,9 @@
     "test:db": "node --test tests/db.test.ts",
     "test:live": "node --test tests/live.test.ts",
     "test:logic": "node --test tests/live-logic.test.ts",
-    "test": "node --test tests/live-logic.test.ts tests/db.test.ts tests/live.test.ts",
-    "check:server": "tsc --ignoreConfig --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --skipLibCheck --types node netlify/functions/import-league.mts tests/db.test.ts tests/live.test.ts tests/live-logic.test.ts"
+    "test:corrections": "node --test tests/corrections.test.ts",
+    "test": "node --test tests/live-logic.test.ts tests/db.test.ts tests/live.test.ts tests/corrections.test.ts",
+    "check:server": "tsc --ignoreConfig --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --skipLibCheck --types node netlify/functions/import-league.mts tests/db.test.ts tests/live.test.ts tests/live-logic.test.ts tests/corrections.test.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

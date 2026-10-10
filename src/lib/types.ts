@@ -36,6 +36,9 @@ export interface Game {
   home_score: number | null;
   away_score: number | null;
   venue: string | null;
+  /** final score set manually by the administrator (overrides the imported one) */
+  score_override?: boolean;
+  imported_score?: [number | null, number | null];
 }
 
 export interface Standing {
@@ -141,7 +144,9 @@ export interface ChangeGroup {
 export interface ChangeEntry {
   id: number;
   group_id: string;
-  table_name: 'players' | 'plate_appearances' | 'game_player_extras' | 'live_lineups' | 'live_sessions';
+  table_name:
+    | 'players' | 'plate_appearances' | 'game_player_extras' | 'live_lineups' | 'live_sessions'
+    | 'live_run_adjustments' | 'game_score_overrides';
   action: 'insert' | 'update' | 'delete' | 'restore';
   old_data: Record<string, unknown> | null;
   new_data: Record<string, unknown>;

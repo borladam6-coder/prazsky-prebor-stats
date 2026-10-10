@@ -82,7 +82,19 @@ class League {
       .eq('season_id', this.season!.id)
       .order('starts_at', { ascending: true, nullsFirst: false });
     if (error) throw error;
-    this.games = (data ?? []) as Game[];
+    const games = (data ?? []) as Game[];
+    // manual final score set by the administrator wins over the imported one
+    const { data: overrides } = await supabase!
+      .from('game_score_overrides')
+      .select('game_id, home_score, away_score')
+      .not('home_score', 'is', null);
+    const byGame = new Map((overrides ?? []).map((o) => [o.game_id as number, o]));
+    this.games = games.map((g) => {
+      const o = byGame.get(g.id);
+      return o
+        ? { ...g, home_score: o.home_score, away_score: o.away_score, imported_score: [g.home_score, g.away_score], score_override: true }
+        : g;
+    });
   }
 
   async loadStandings() {

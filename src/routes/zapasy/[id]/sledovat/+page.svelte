@@ -4,17 +4,17 @@
   import { page } from '$app/state';
   import { untrack } from 'svelte';
   import { fade, fly } from 'svelte/transition';
-  import { flip } from 'svelte/animate';
   import { league } from '#lib/league.svelte.ts';
   import { supabase } from '#lib/supabase.ts';
   import { liveOfGame, gameEntries, gamePlayLog, errorMessage, LIVE_STALE_MS } from '#lib/api.ts';
-  import { battingTeam, byHalfInning, lineScore, type PlayItem } from '#lib/plays.ts';
+  import { battingTeam, lineScore, type PlayItem } from '#lib/plays.ts';
   import { resultDef } from '#lib/stats.ts';
   import { longDate, plural, time } from '#lib/format.ts';
   import type { GameExtras, LiveLineup, LiveSession, PlateAppearance, Team } from '#lib/types.ts';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Diamond from '#lib/components/Diamond.svelte';
   import Icon from '#lib/components/Icon.svelte';
+  import PlayLog from '#lib/components/PlayLog.svelte';
 
   const id = $derived(Number(page.params.id));
   const game = $derived(league.game(id));
@@ -32,7 +32,8 @@
 
   async function load() {
     try {
-      const [l, e, p] = await Promise.all([liveOfGame(id), gameEntries(id), gamePlayLog(id)]);
+      const [l, e] = await Promise.all([liveOfGame(id), gameEntries(id)]);
+      const p = await gamePlayLog(id, e.pas);
       sessions = l.sessions;
       lineups = l.lineups;
       pas = e.pas;
@@ -66,6 +67,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_lineups', filter }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plate_appearances', filter }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_player_extras', filter }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_run_adjustments', filter }, refresh)
       .subscribe();
     // fallback when realtime is unavailable (and to age out a quiet session)
     const tick = setInterval(load, 60_000);
@@ -106,7 +108,6 @@
   const innings = $derived(
     Math.max(7, session?.inning ?? 0, ...[...line.values()].map((r) => r.length))
   );
-  const halves = $derived(byHalfInning(plays));
   const teams = $derived([away, home].filter((t): t is Team => !!t));
 
   // lineup tab: follows the batting team until the viewer picks one
@@ -280,40 +281,10 @@
 
     <div class="cols">
       <!-- ------------------------------------------------------------ play by play -->
-      {#if halves.length}
+      {#if plays.length}
         <section class="feed" aria-labelledby="feed-title">
           <h2 id="feed-title">Průběh zápasu</h2>
-          {#each halves as h (h.key)}
-            {@const t = team(h.teamId)}
-            <div class="half" style:--team={t?.color} animate:flip={{ duration: 200 }}>
-              <header>
-                <span class="hn">{h.inning}. směna {h.teamId === game.away_team_id ? '▲' : '▼'}</span>
-                <span class="ht"><TeamBadge team={t} size={18} /> {t?.short_name ?? ''}</span>
-                {#if h.runs}<span class="pill pos">+{h.runs} {plural(h.runs, ['bod', 'body', 'bodů'])}</span>{/if}
-              </header>
-              <ol>
-                {#each h.plays as p (p.id)}
-                  <li in:fly={{ y: -8, duration: 220 }}>
-                    <span class="res-chip g-{p.result ? resultDef(p.result)?.group : 'run'}">{p.result ?? 'SB'}</span>
-                    <span class="desc">
-                      {#if p.result}
-                        <strong>{name(p.batter)}</strong> <span class="muted">{resultDef(p.result)?.label}</span>
-                      {:else}
-                        <strong>Pohyb běžců</strong>
-                      {/if}
-                      <span class="extra">
-                        {#if p.stole.length}<span>ukradená meta: {p.stole.map(short).join(', ')}</span>{/if}
-                        {#if p.scored.length}<span class="sc">doběh: {p.scored.map(short).join(', ')}</span>{/if}
-                        {#if p.rbi}<span>{p.rbi} RBI</span>{/if}
-                        {#if p.inningEnded}<span class="end">3. aut, konec poloviny</span>{:else if p.outs}<span class="out">{p.outs === 1 ? `${p.outsAfter}. aut` : `${p.outs} auty (${p.outsAfter} celkem)`}</span>{/if}
-                      </span>
-                    </span>
-                    {#if p.runs}<span class="plus">+{p.runs}</span>{/if}
-                  </li>
-                {/each}
-              </ol>
-            </div>
-          {/each}
+          <PlayLog {plays} awayTeamId={game.away_team_id} />
         </section>
       {/if}
 
@@ -731,87 +702,6 @@
   .feed h2 {
     margin-bottom: 12px;
   }
-  .half {
-    margin-bottom: 12px;
-    border-radius: var(--r-l);
-    background: var(--surface);
-    border: 1px solid var(--line);
-    overflow: hidden;
-  }
-  .half header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--team) 18%, transparent), transparent 70%);
-    border-bottom: 1px solid var(--line);
-  }
-  .hn {
-    font-weight: 800;
-  }
-  .ht {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 700;
-    color: var(--muted);
-    margin-right: auto;
-  }
-  .half ol {
-    list-style: none;
-    margin: 0;
-    padding: 4px 0;
-  }
-  .half li {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 10px;
-    padding: 9px 14px;
-  }
-  .half li + li {
-    border-top: 1px dashed var(--line);
-  }
-  .res-chip {
-    min-width: 40px;
-    padding: 5px 6px;
-    font-size: 13px;
-  }
-  .desc {
-    display: grid;
-    gap: 3px;
-    min-width: 0;
-    font-size: 14.5px;
-  }
-  .desc .muted {
-    font-size: 13px;
-    margin-left: 4px;
-  }
-  .extra {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 10px;
-    font-size: 12.5px;
-    color: var(--muted);
-  }
-  .extra .sc {
-    color: var(--pos);
-    font-weight: 700;
-  }
-  .extra .out {
-    color: var(--neg);
-    font-weight: 600;
-  }
-  .extra .end {
-    color: var(--neg);
-    font-weight: 800;
-  }
-  .plus {
-    font-weight: 800;
-    font-size: 18px;
-    color: var(--pos);
-  }
-
   .lu-head {
     display: flex;
     align-items: center;

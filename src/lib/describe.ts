@@ -80,6 +80,12 @@ function describeEntry(e: ChangeEntry): string {
     if (e.action === 'insert') return `Začátek živého zápisu (${teamLabel(n.team_id)})`;
     return `Živý zápis ${teamLabel(n.team_id)}: ${describeSession(o, n)}`;
   }
+  if (e.table_name === 'live_run_adjustments') {
+    return `Oprava doběhů ${Number(n.delta) > 0 ? '+1' : '−1'} ${playerName(n.player_id)} (${n.inning}. směna)${n.cancelled ? ', zrušeno' : ''}`;
+  }
+  if (e.table_name === 'game_score_overrides') {
+    return n.home_score == null ? 'Ruční skóre zrušeno' : `Ruční skóre ${n.home_score}:${n.away_score}`;
+  }
   if (e.table_name === 'live_lineups') {
     const count = (n.players as unknown[] | undefined)?.length ?? 0;
     return `Pořadí pálkařů ${teamLabel(n.team_id)}: ${count} ${plural(count, ['hráč', 'hráči', 'hráčů'])}`;
@@ -137,6 +143,30 @@ export function describe(group: ChangeGroup, entries: ChangeEntry[]): Described 
       return { title: `Konec živého zápisu (${team})`, context: gameLabel(gameId), gameId };
     case 'live_reopen':
       return { title: `Pokračování živého zápisu (${team})`, context: gameLabel(gameId), gameId };
+    case 'live_adjust': {
+      const adj = entries.find((e) => e.table_name === 'live_run_adjustments');
+      const n = adj?.new_data ?? {};
+      const sign = Number(n.delta) > 0 ? '+1' : '−1';
+      return { title: `Oprava doběhů: ${sign} ${playerName(n.player_id)} (${n.inning}. směna)`, context: gameLabel(gameId), gameId };
+    }
+    case 'live_delete_play': {
+      const pa = entries.find((e) => e.table_name === 'plate_appearances');
+      const what = pa ? `${playerName(pa.new_data.player_id)}: ${res(pa.old_data?.result ?? pa.new_data.result)}` : 'pohyb běžců';
+      return { title: `Smazána akce živého zápisu (${what})`, context: gameLabel(gameId), gameId };
+    }
+    case 'live_rewind':
+      return { title: 'Živý zápis vrácen k dřívější akci', context: gameLabel(gameId), gameId };
+    case 'admin_reset_game':
+      return { title: 'Správce smazal celý záznam zápasu', context: gameLabel(gameId), gameId };
+    case 'admin_set_score': {
+      const o = entries.find((e) => e.table_name === 'game_score_overrides')?.new_data ?? {};
+      const title = o.home_score == null ? 'Správce zrušil ruční skóre' : `Správce nastavil skóre ${o.home_score}:${o.away_score}`;
+      return { title, context: gameLabel(gameId), gameId };
+    }
+    case 'admin_revert':
+      return { title: 'Správce vrátil změnu', context: gameLabel(gameId), gameId };
+    case 'admin_change_code':
+      return { title: 'Změna kódu správce', context: null, gameId: null };
   }
 
   const prefix = group.action === 'revert' ? 'Vrácení změny: ' : '';

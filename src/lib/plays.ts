@@ -25,6 +25,16 @@ export interface LogEntry {
 
 export interface PlayItem {
   id: string;
+  /** a play, or a manual correction of runs in an inning */
+  kind: 'play' | 'adjust';
+  /** plate appearance of this play (for editing) */
+  paId: string | null;
+  /** result or RBI changed after the play was recorded */
+  edited: boolean;
+  /** the plate appearance was deleted later */
+  paDeleted: boolean;
+  /** runs taken away by a correction */
+  removed: string[];
   at: string;
   actor: string | null;
   teamId: number;
@@ -44,7 +54,10 @@ export interface PlayItem {
 
 const num = (v: unknown) => Number(v ?? 0);
 
-export function buildPlays(groups: LogGroup[], entries: LogEntry[]): PlayItem[] {
+/** Current (not deleted) plate appearances of the game, so that later edits show in the play log. */
+export type CurrentPas = Map<string, { result: PaResult; rbi: number; deleted: boolean }>;
+
+export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: CurrentPas): PlayItem[] {
   const byGroup = new Map<string, LogEntry[]>();
   for (const e of entries) {
     const list = byGroup.get(e.group_id);
@@ -54,8 +67,24 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[]): PlayItem[] 
 
   const plays: PlayItem[] = [];
   for (const g of groups) {
-    if (g.action !== 'live_play' || g.reverted_by_group_id) continue;
+    if (g.reverted_by_group_id) continue;
     const list = byGroup.get(g.id) ?? [];
+
+    if (g.action === 'live_adjust') {
+      const adj = list.find((e) => e.table_name === 'live_run_adjustments' && e.action === 'insert');
+      if (!adj) continue;
+      const a = adj.new_data;
+      const player = String(a.player_id);
+      const delta = num(a.delta);
+      plays.push({
+        id: g.id, kind: 'adjust', paId: null, edited: false, paDeleted: false,
+        at: g.at, actor: g.actor_name, teamId: num(a.team_id), inning: num(a.inning),
+        outsBefore: 0, outsAfter: 0, inningEnded: false, batter: null, result: null, rbi: 0,
+        scored: delta > 0 ? [player] : [], removed: delta < 0 ? [player] : [], stole: [], runs: delta, outs: 0
+      });
+      continue;
+    }
+    if (g.action !== 'live_play') continue;
     const session = list.find((e) => e.table_name === 'live_sessions' && e.old_data);
     if (!session) continue;
     const o = session.old_data!;
@@ -75,8 +104,18 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[]): PlayItem[] 
 
     const outsBefore = num(o.outs);
     const outsAfter = inningEnded ? 3 : num(n.outs);
+    const paId = pa ? String(pa.new_data.id) : null;
+    const now = paId ? current?.get(paId) : undefined;
+    const recorded = pa ? (String(pa.new_data.result) as PaResult) : null;
+    const recordedRbi = pa ? num(pa.new_data.rbi) : 0;
     plays.push({
       id: g.id,
+      kind: 'play',
+      paId,
+      edited: !!now && !now.deleted && (now.result !== recorded || now.rbi !== recordedRbi),
+      // a plate appearance missing from the current list was deleted later
+      paDeleted: !!paId && !!current && (!now || now.deleted),
+      removed: [],
       at: g.at,
       actor: g.actor_name,
       teamId: num(n.team_id),
@@ -85,8 +124,8 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[]): PlayItem[] 
       outsAfter,
       inningEnded,
       batter: pa ? String(pa.new_data.player_id) : null,
-      result: pa ? (String(pa.new_data.result) as PaResult) : null,
-      rbi: pa ? num(pa.new_data.rbi) : 0,
+      result: now && !now.deleted ? now.result : recorded,
+      rbi: now && !now.deleted ? now.rbi : recordedRbi,
       scored,
       stole,
       runs: scored.length,

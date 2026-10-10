@@ -14,6 +14,7 @@
   import { toasts } from '#lib/toast.svelte.ts';
   import type { GameExtras, LiveSession, PaResult, PlateAppearance, Player, PlayerGameLine, Team } from '#lib/types.ts';
   import LiveCard from '#lib/components/LiveCard.svelte';
+  import AdminPanel from '#lib/components/AdminPanel.svelte';
   import StatTable from '#lib/components/StatTable.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import HistoryList from '#lib/components/HistoryList.svelte';
@@ -48,7 +49,9 @@
   let loaded = $state(false);
   let loadError = $state<string | null>(null);
 
-  let tab = $state<'box' | 'entry' | 'history'>(page.url.searchParams.has('zapis') ? 'entry' : 'box');
+  let tab = $state<'box' | 'entry' | 'history'>(
+    page.url.searchParams.has('zapis') ? 'entry' : page.url.searchParams.has('historie') ? 'history' : 'box'
+  );
   let entryTeamId = $state<number | null>(null);
   let openPlayer = $state<string | null>(null);
   let busy = $state(false);
@@ -242,6 +245,7 @@
         <span class="role">hosté</span>
       </div>
       <p class="info">
+        {#if game.score_override}<span class="pill warn override">skóre upravil správce</span><br />{/if}
         {longDate(game.starts_at)}{game.starts_at ? `, ${time(game.starts_at)}` : ''}{game.venue ? `, ${game.venue}` : ''}
       </p>
     </section>
@@ -410,6 +414,8 @@
         <HistoryList bind:this={historyList} gameId={id} onreverted={load} />
       </div>
     {/if}
+
+    <AdminPanel {game} onchanged={() => { load(); historyList?.reload(); }} />
   {/if}
 </div>
 
@@ -487,6 +493,9 @@
     font-weight: 800;
     font-size: 28px;
     color: var(--muted);
+  }
+  .override {
+    margin-bottom: 6px;
   }
   .info {
     grid-column: 1 / -1;

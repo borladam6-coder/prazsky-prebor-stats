@@ -23,6 +23,10 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Sledovat** (z přehledu, detailu zápasu nebo výběru na stránce živého zápisu) otevře pohled jen pro diváky: skóre, směna a auty, diamant s běžci, kdo je na pálce, skóre po směnách, průběh zápasu po polovinách směn a sestavy s dnešními výsledky. Aktualizuje se sám.
 
+**Opravy:** v živém zápisu je u každé akce v Průběhu zápasu tužka. Jde opravit výsledek a RBI, přidat nebo odebrat doběh v té směně, akci smazat nebo vrátit celý zápis k ní. Všechno je v historii a dá se vrátit.
+
+**Správce** (dole v detailu zápasu → Správa zápasu, odemyká se kódem správce): ruční konečné skóre (import ho nepřepíše) a smazání celého záznamu zápasu. Změny správce může vrátit jen správce. V databázi je jen bcrypt hash kódu (`private.settings.admin_code_hash`). Kód jde změnit přímo na webu. Při zapomenutí ho nastaví nový hash v SQL Editoru: `update private.settings set admin_code_hash = extensions.crypt('NOVYKOD', extensions.gen_salt('bf', 8));` (kód bez pomlček, velkými písmeny).
+
 Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny.
 
 ## Struktura
@@ -31,6 +35,7 @@ Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box
 supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové funkce, historie, statistiky
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
+supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
 netlify/functions/import-league.mts plánovaný import ze softball.cz
 netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
@@ -46,7 +51,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql` a `003_live_undo_game.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql` a `004_admin_and_corrections.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

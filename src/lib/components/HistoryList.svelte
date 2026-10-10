@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { history, revertGroup, errorMessage, WriteCancelled } from '../api.ts';
+  import { history, revertGroup, adminRevertGroup, errorMessage, WriteCancelled } from '../api.ts';
+  import { admin } from '../admin.svelte.ts';
   import { describe } from '../describe.ts';
   import { ago, stamp } from '../format.ts';
   import { toasts } from '../toast.svelte.ts';
@@ -55,7 +56,7 @@
   async function revert(g: ChangeGroup) {
     busy = g.id;
     try {
-      await revertGroup(g.id);
+      await (isAdmin(g) ? adminRevertGroup(g.id) : revertGroup(g.id));
       toasts.show('Změna vrácena.');
       await reload();
       onreverted?.();
@@ -67,6 +68,11 @@
   }
 
   onMount(reload);
+
+  /** changes of the administrator can only be reverted by the administrator */
+  const isAdmin = (g: ChangeGroup) => g.action.startsWith('admin_');
+  const canRevert = (g: ChangeGroup) =>
+    g.source === 'web' && !g.reverted_by_group_id && g.action !== 'admin_change_code' && (!isAdmin(g) || admin.unlocked);
 
   const byGroup = $derived.by(() => {
     const m = new Map<string, ChangeEntry[]>();
@@ -99,7 +105,7 @@
             {#if g.reverted_by_group_id}<span class="tag">vráceno</span>{/if}
           </span>
         </div>
-        {#if g.source === 'web' && !g.reverted_by_group_id}
+        {#if canRevert(g)}
           <button type="button" class="btn btn-quiet undo" disabled={busy !== null} onclick={() => revert(g)} title="Vrátit tuto změnu">
             <Icon name="undo" size={18} />
             <span>{busy === g.id ? 'Vracím…' : 'Vrátit'}</span>
