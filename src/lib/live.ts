@@ -170,7 +170,7 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     if (play.batterTo !== null || play.rbi) return 'Bez výsledku na pálce nejde zapsat pálkaře ani RBI.';
     if (!play.runners.some((r) => r.to !== r.from)) return 'Žádný běžec se neposunul.';
   } else {
-    if ((play.result === 'SF' || play.result === 'SH') && outs >= 2) return 'Obětovaný odpal jde jen při méně než 2 autech.';
+    if ((play.result === 'SF' || play.result === 'SH') && outs >= 2) return 'Obětovaný odpal jde jen při méně než 2 outech.';
     const [lo, hi] = BATTER_RANGE[play.result];
     if (play.batterTo === null || play.batterTo < lo || play.batterTo > hi) return 'Pálkař s tímto výsledkem nemůže skončit na zadané metě.';
     if (play.batterTo >= 1 && play.batterTo <= 3) {
@@ -190,7 +190,7 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
       }
     }
   }
-  if (outs + outsOn(play) > 3) return 'V jedné směně nemohou být víc než 3 auty.';
+  if (outs + outsOn(play) > 3) return 'V jedné směně nemohou být víc než 3 outy.';
   return null;
 }
 
@@ -227,4 +227,4 @@ export function batterChoices(result: PaResult): Dest[] {
 }
 
 export const destLabel = (d: Dest, from?: number): string =>
-  d === 0 ? 'Aut' : d === 4 ? 'Doběhl' : d === from ? `Zůstal (${d}.)` : `${d}. meta`;
+  d === 0 ? 'Out' : d === 4 ? 'Doběhl' : d === from ? `Zůstal (${d}.)` : `${d}. meta`;

@@ -81,7 +81,7 @@ test('validation catches impossible plays', () => {
   assert.match(validatePlay({ result: 'SF', batterTo: 0, runners: [{ from: 3, to: 4 }], rbi: 1 }, [null, null, 'z'], 2)!, /méně než 2/);
   assert.match(validatePlay({ result: null, batterTo: null, runners: [{ from: 1, to: 1 }], rbi: 0 }, ['x', null, null], 0)!, /neposunul/);
   assert.equal(validatePlay({ result: null, batterTo: null, runners: [{ from: 1, to: 2, sb: true }], rbi: 0 }, ['x', null, null], 0), null);
-  assert.match(validatePlay({ result: 'K', batterTo: 0, runners: [{ from: 1, to: 0 }, { from: 2, to: 0 }, { from: 3, to: 3 }], rbi: 0 }, LOADED, 2)!, /3 auty/);
+  assert.match(validatePlay({ result: 'K', batterTo: 0, runners: [{ from: 1, to: 0 }, { from: 2, to: 0 }, { from: 3, to: 3 }], rbi: 0 }, LOADED, 2)!, /3 outy/);
 });
 
 test('defaults are always valid', () => {

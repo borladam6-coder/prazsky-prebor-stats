@@ -3,7 +3,7 @@
 import type { ChangeEntry, ChangeGroup } from './types.ts';
 import { league } from './league.svelte.ts';
 import { resultDef } from './stats.ts';
-import { plural } from './format.ts';
+import { plural, outsWord } from './format.ts';
 
 export interface Described {
   title: string;
@@ -34,14 +34,14 @@ const teamLabel = (id: unknown) => {
   return t?.short_name ?? t?.name ?? '';
 };
 
-const outsLabel = (n: number) => `${n} ${plural(n, ['aut', 'auty', 'autů'])}`;
+const outsLabel = outsWord;
 
 function describeSession(o: Record<string, unknown>, n: Record<string, unknown>): string {
   if (Number(n.inning) > Number(o.inning)) return `konec ${o.inning}. směny`;
   if (Number(n.inning) < Number(o.inning)) return `zpět do ${n.inning}. směny`;
   if (n.finished !== o.finished) return n.finished ? 'zápis ukončen' : 'zápis znovu otevřen';
   const d = Number(n.outs) - Number(o.outs);
-  if (d > 0) return `${d === 1 ? 'aut' : outsLabel(d)} (${n.inning}. směna, ${outsLabel(Number(n.outs))})`;
+  if (d > 0) return `${d === 1 ? 'out' : outsLabel(d)} (${n.inning}. směna, ${outsLabel(Number(n.outs))})`;
   return `${n.inning}. směna, ${outsLabel(Number(n.outs))}`;
 }
 

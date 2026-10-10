@@ -61,3 +61,6 @@ export function plural(n: number, forms: [string, string, string]): string {
   if (n >= 2 && n <= 4) return forms[1];
   return forms[2];
 }
+
+/** "1 out", "2 outy", "0 outů" – softball term with Czech plural. */
+export const outsWord = (n: number) => `${n} ${plural(n, ['out', 'outy', 'outů'])}`;

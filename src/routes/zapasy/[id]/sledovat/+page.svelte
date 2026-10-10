@@ -9,7 +9,7 @@
   import { liveOfGame, gameEntries, gamePlayLog, errorMessage, LIVE_STALE_MS } from '#lib/api.ts';
   import { battingTeam, lineScore, type PlayItem } from '#lib/plays.ts';
   import { resultDef } from '#lib/stats.ts';
-  import { longDate, plural, time } from '#lib/format.ts';
+  import { longDate, outsWord, plural, time } from '#lib/format.ts';
   import type { GameExtras, LiveLineup, LiveSession, PlateAppearance, Team } from '#lib/types.ts';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Diamond from '#lib/components/Diamond.svelte';
@@ -145,7 +145,6 @@
 
   const name = (pid: string | null) => league.player(pid)?.name ?? '?';
   const short = (pid: string | null) => name(pid).split(' ')[0];
-  const outsWord = (n: number) => `${n} ${plural(n, ['aut', 'auty', 'autů'])}`;
   const team = (tid: number | null | undefined) => league.team(tid);
 </script>
 

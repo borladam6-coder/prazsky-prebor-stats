@@ -1,7 +1,7 @@
 <script lang="ts">
   // One game being scored live: score from the box score, inning, outs and runners.
   import { league } from '../league.svelte.ts';
-  import { plural } from '../format.ts';
+  import { outsWord } from '../format.ts';
   import type { Game, LiveSession } from '../types.ts';
   import TeamBadge from './TeamBadge.svelte';
   import Diamond from './Diamond.svelte';
@@ -33,7 +33,7 @@
   <span class="top">
     <span class="badge"><span class="pulse"></span> Živě</span>
     {#if current}
-      <span class="muted">{current.inning}. směna, {current.outs} {plural(current.outs, ['aut', 'auty', 'autů'])}</span>
+      <span class="muted">{current.inning}. směna, {outsWord(current.outs)}</span>
     {/if}
   </span>
 
