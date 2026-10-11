@@ -193,9 +193,6 @@
   {/if}
 
   {#if !fieldMode || kind}
-  {#if fieldMode && recorded}
-    <p class="derived">Zapíše se: <strong>{recorded}</strong></p>
-  {/if}
   <div class="rows">
     {#if result && play.batterTo !== null}
       <fieldset class="row">
@@ -241,27 +238,29 @@
     {/if}
   </div>
 
-  {#if !fieldMode || kind}
-  <p class="preview" aria-live="polite">
-    {#if runs}<span class="pill pos">+{runs} {plural(runs, ['run', 'runs', 'runs'])}</span>{/if}
-    {#if outsOn(play)}<span class="pill neg">{outsWord(outsOn(play))}</span>{/if}
-    {#if after.inningOver}
-      <span>Konec {inning}. směny.</span>
-    {:else}
-      <span class="muted">Potom: {outsWord(after.outs)}, {basesText(after.bases)}.</span>
-    {/if}
-  </p>
   {/if}
 
-  {/if}
-
-  {#if error && (!fieldMode || kind)}<p class="err" role="alert">{error}</p>{/if}
-
-  <div class="actions">
-    <button type="button" class="btn btn-quiet" onclick={oncancel}>Zrušit</button>
-    {#if !oneTap}
-      <button type="submit" class="btn btn-primary" disabled={!!error || busy || (fieldMode && !kind)}><Icon name="check" size={18} /> Uložit</button>
+  <!-- what will be recorded stays in view next to the confirm button -->
+  <div class="foot">
+    {#if !fieldMode || kind}
+      <p class="preview" aria-live="polite">
+        {#if fieldMode && recorded}<span class="derived">Zapíše se <strong>{recorded}</strong></span>{/if}
+        {#if runs}<span class="pill pos">+{runs} {plural(runs, ['run', 'runs', 'runs'])}</span>{/if}
+        {#if outsOn(play)}<span class="pill out">{outsWord(outsOn(play))}</span>{/if}
+        {#if after.inningOver}
+          <span class="end">Konec {inning}. směny</span>
+        {:else}
+          <span class="muted">Potom {outsWord(after.outs)}, {basesText(after.bases)}</span>
+        {/if}
+      </p>
     {/if}
+    {#if error && (!fieldMode || kind)}<p class="err" role="alert"><Icon name="warn" size={15} /> {error}</p>{/if}
+    <div class="actions">
+      <button type="button" class="btn btn-quiet" onclick={oncancel}>Zrušit</button>
+      {#if !oneTap}
+        <button type="submit" class="btn btn-primary" disabled={!!error || busy || (fieldMode && !kind)}><Icon name="check" size={18} /> Uložit</button>
+      {/if}
+    </div>
   </div>
 </form>
 </div>
@@ -282,7 +281,7 @@
     bottom: 0;
     max-height: 88dvh;
     overflow-y: auto;
-    padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    padding: 18px 16px 0;
     border-radius: 24px 24px 0 0;
     background: var(--surface);
     border: 1px solid var(--line-strong);
@@ -346,13 +345,18 @@
     cursor: pointer;
   }
   .wp[aria-pressed='true'] {
-    background: var(--pill-active-bg);
-    border-color: var(--pill-active-bg);
-    color: var(--pill-active-ink);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--ink);
   }
   .wp.none {
+    padding: 0 2px;
     font-weight: 700;
-    font-size: 12.5px;
+    font-size: 11.5px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .kinds {
     display: grid;
@@ -393,11 +397,14 @@
   }
   .kinds.compact {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    grid-auto-rows: 1fr;
     gap: 6px;
   }
   .kinds.compact .kind {
     padding: 8px 10px;
     text-align: center;
+    align-content: center;
+    line-height: 1.15;
   }
   .kinds.compact .kind strong {
     font-size: 13.5px;
@@ -412,10 +419,7 @@
     background: var(--accent-soft);
   }
   .derived {
-    margin: 0 0 12px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: var(--surface-2);
+    flex-basis: 100%;
     font-size: 14px;
   }
   .rows {
@@ -467,19 +471,23 @@
     cursor: pointer;
     transition: background-color 140ms, border-color 140ms, color 140ms;
   }
+  .ch {
+    line-height: 1.15;
+  }
+  /* one selection style; only the outcome of a runner keeps its meaning colour */
   .ch[aria-pressed='true'] {
-    background: var(--pill-active-bg);
-    border-color: var(--pill-active-bg);
-    color: var(--pill-active-ink);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--ink);
   }
   .ch.out[aria-pressed='true'] {
-    background: var(--neg);
-    border-color: var(--neg);
+    background: var(--out);
+    border-color: var(--out);
     color: #fff;
   }
   .ch.home[aria-pressed='true'] {
-    background: var(--pos);
-    border-color: var(--pos);
+    background: var(--hit);
+    border-color: var(--hit);
     color: #06140c;
   }
   .sb {
@@ -530,17 +538,37 @@
     font-weight: 800;
     font-size: 20px;
   }
+  .foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 14px -16px 0;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
   .preview {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    margin: 16px 0 0;
-    font-size: 14px;
+    gap: 6px 8px;
+    margin: 0 0 10px;
+    font-size: 13.5px;
+  }
+  .pill.out {
+    background: var(--out-soft);
+    color: var(--out);
+  }
+  .end {
+    font-weight: 700;
+    color: var(--out);
   }
   .err {
-    margin: 10px 0 0;
-    color: var(--neg);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 10px;
+    color: var(--warn);
     font-weight: 600;
     font-size: 14px;
   }
@@ -548,7 +576,6 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 16px;
   }
   .actions .btn-primary {
     flex: 1 1 auto;

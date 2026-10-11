@@ -1,23 +1,44 @@
 <script lang="ts">
-  // League table from softball.cz with win share bars and run difference.
+  // League table from softball.cz: team colour stripe, PCT, games behind and the form of
+  // the last five games (W/L letters, so it does not rely on colour).
   import { league } from '../league.svelte.ts';
+  import { rate } from '../format.ts';
   import TeamBadge from './TeamBadge.svelte';
 
+  const sorted = $derived([...league.standings].sort((a, b) => (a.position ?? 99) - (b.position ?? 99)));
+  const top = $derived(sorted[0]);
+
+  function form(teamId: number): ('W' | 'L' | 'T')[] {
+    return league.games
+      .filter((g) => (g.home_team_id === teamId || g.away_team_id === teamId) && g.home_score !== null && g.away_score !== null)
+      .sort((a, b) => (b.starts_at ?? '').localeCompare(a.starts_at ?? ''))
+      .slice(0, 5)
+      .reverse()
+      .map((g) => {
+        const mine = g.home_team_id === teamId ? g.home_score! : g.away_score!;
+        const theirs = g.home_team_id === teamId ? g.away_score! : g.home_score!;
+        return mine > theirs ? 'W' : mine < theirs ? 'L' : 'T';
+      });
+  }
+
   const rows = $derived(
-    [...league.standings]
-      .sort((a, b) => (a.position ?? 99) - (b.position ?? 99))
-      .map((s) => ({
+    sorted.map((s) => {
+      const gb = top ? (top.wins - s.wins + (s.losses - top.losses)) / 2 : 0;
+      return {
         ...s,
-        share: s.games ? s.wins / s.games : 0,
-        diff: s.runs_for - s.runs_against
-      }))
+        pct: s.games ? s.wins / s.games : null,
+        gb: gb <= 0 ? '–' : Number.isInteger(gb) ? String(gb) : gb.toFixed(1),
+        diff: s.runs_for - s.runs_against,
+        form: form(s.team_id)
+      };
+    })
   );
 </script>
 
 <section class="card standings" aria-labelledby="standings-title">
   <header>
     <h2 id="standings-title">Tabulka</h2>
-    <span class="src">Pořadí podle <a href="https://softball.cz/ligy/PPM" rel="noopener">softball.cz</a></span>
+    <span class="src">podle <a href="https://softball.cz/ligy/PPM" rel="noopener">softball.cz</a></span>
   </header>
 
   <table>
@@ -25,39 +46,38 @@
       <tr>
         <th scope="col" class="pos">#</th>
         <th scope="col" class="team">Tým</th>
-        <th scope="col" class="games" title="Games">G</th>
         <th scope="col" title="Wins">W</th>
         <th scope="col" title="Losses">L</th>
-        <th scope="col" class="share" title="Winning percentage">PCT</th>
-        <th scope="col" class="wide" title="Runs scored : runs allowed">RS:RA</th>
-        <th scope="col" title="Run differential">+/−</th>
+        <th scope="col" class="num" title="Winning percentage">PCT</th>
+        <th scope="col" class="num" title="Games behind: zápasy za prvním">GB</th>
+        <th scope="col" class="formh" title="Posledních 5 zápasů">Forma</th>
+        <th scope="col" class="wide num" title="Runs scored : runs allowed">RS:RA</th>
+        <th scope="col" class="wide num" title="Run differential">+/−</th>
         <th scope="col" class="pts" title="Body v tabulce">Body</th>
       </tr>
     </thead>
     <tbody>
       {#each rows as s, i (s.team_id)}
         {@const team = league.team(s.team_id)}
-        <tr class="rise" class:leader={i === 0} style:--i={i}>
+        <tr class="rise" style:--i={i} style:--team={team?.color ?? 'var(--faint)'}>
           <td class="pos">{s.position ?? '–'}</td>
           <th scope="row" class="team">
             <a href="/tymy/{s.team_id}">
-              <TeamBadge {team} size={30} eager />
+              <TeamBadge {team} size={26} eager />
               <span class="full">{team?.name ?? s.team_id}</span>
               <span class="short">{team?.short_name ?? team?.code}</span>
             </a>
           </th>
-          <td class="dim games">{s.games}</td>
           <td class="strong">{s.wins}</td>
           <td class="dim">{s.losses}</td>
-          <td class="share">
-            <span class="sharebox">
-              <span class="bar"><span class="fill" style:--w={s.share} style:--i={i}></span></span>
-              <span class="pct">{Math.round(s.share * 100)} %</span>
-            </span>
+          <td class="num">{rate(s.pct)}</td>
+          <td class="num dim">{s.gb}</td>
+          <td class="form" aria-label="Forma: {s.form.join(' ') || 'zatím bez zápasů'}">
+            {#each s.form as f, j (j)}<span class="f {f}">{f}</span>{/each}
           </td>
-          <td class="wide dim">{s.runs_for}:{s.runs_against}</td>
-          <td><span class="pill {s.diff >= 0 ? 'pos' : 'neg'}">{s.diff > 0 ? '+' : s.diff < 0 ? '−' : ''}{Math.abs(s.diff)}</span></td>
-          <td class="pts">{s.points}</td>
+          <td class="wide num dim">{s.runs_for}:{s.runs_against}</td>
+          <td class="wide num diff" class:plus={s.diff > 0} class:minus={s.diff < 0}>{s.diff > 0 ? '+' : s.diff < 0 ? '−' : ''}{Math.abs(s.diff)}</td>
+          <td class="pts num-c">{s.points}</td>
         </tr>
       {/each}
     </tbody>
@@ -66,70 +86,67 @@
 
 <style>
   .standings {
-    padding: 22px 10px 12px;
+    padding: 20px 10px 10px;
   }
   header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
-    padding: 0 12px 14px;
+    padding: 0 12px 12px;
   }
   .src {
     font-size: 13px;
     color: var(--muted);
   }
   .src a {
-    color: var(--accent-text);
+    color: inherit;
   }
-
   table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0 4px;
-    font-size: 15px;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    font-variant-numeric: tabular-nums;
   }
   thead th {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--faint);
     text-align: center;
-    padding: 0 6px 6px;
+    padding: 0 4px 8px;
   }
-  thead th.team,
-  thead th.share {
+  thead th.team {
     text-align: left;
   }
   td,
   th {
     text-align: center;
-    padding: 10px 6px;
+    padding: 9px 4px;
   }
-  tbody td:first-child {
-    border-radius: 12px 0 0 12px;
-  }
-  tbody td:last-child {
-    border-radius: 0 12px 12px 0;
+  tbody tr + tr td,
+  tbody tr + tr th {
+    border-top: 1px solid var(--line);
   }
   tbody tr:hover td,
   tbody tr:hover th {
     background: var(--surface-2);
   }
+  /* team colour as a thin stripe at the row edge */
   .pos {
-    width: 34px;
+    width: 30px;
     color: var(--muted);
     text-align: left;
-    padding-left: 12px;
+    padding-left: 10px;
+    box-shadow: inset 3px 0 0 var(--team);
   }
   .team {
     text-align: left;
-    width: 100%;
     font-weight: 700;
   }
   .team a {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     text-decoration: none;
     min-width: 0;
   }
@@ -148,43 +165,50 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .num {
+    text-align: right;
+  }
+  thead th.num {
+    text-align: right;
+  }
   .dim {
     color: var(--muted);
   }
   .strong {
     font-weight: 800;
   }
-  .share {
-    display: none;
+  .form {
+    white-space: nowrap;
   }
-  .sharebox {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 150px;
+  .f {
+    display: inline-grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    margin: 0 1px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 800;
   }
-  .bar {
-    flex: 1;
-    height: 6px;
-    border-radius: 3px;
+  .f.W {
+    background: var(--hit-soft);
+    color: var(--hit);
+  }
+  .f.L {
+    background: var(--out-soft);
+    color: var(--out);
+  }
+  .f.T {
     background: var(--surface-3);
-    overflow: hidden;
+    color: var(--muted);
   }
-  .fill {
-    display: block;
-    height: 100%;
-    width: calc(var(--w) * 100%);
-    border-radius: 3px;
-    background: var(--faint);
-    transform-origin: left;
-    animation: grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    animation-delay: calc(var(--i) * 45ms + 150ms);
-  }
-  .pct {
-    font-size: 13px;
+  .diff.plus {
+    color: var(--hit);
     font-weight: 700;
-    min-width: 3.2em;
-    text-align: right;
+  }
+  .diff.minus {
+    color: var(--out);
+    font-weight: 700;
   }
   .wide {
     display: none;
@@ -192,31 +216,14 @@
   .pts {
     font-weight: 800;
     font-size: 18px;
-    padding-right: 12px;
+    padding-right: 10px;
+    text-align: right;
   }
   thead th.pts {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
+    text-align: right;
   }
-
-  .leader td,
-  .leader th {
-    background: var(--accent-soft);
-  }
-  .leader .pos,
-  .leader .pts {
-    color: var(--accent-text);
-  }
-  .leader .fill {
-    background: var(--accent);
-  }
-
-  @keyframes grow {
-    from {
-      transform: scaleX(0);
-    }
-  }
-
   @media (min-width: 640px) {
     .full {
       display: inline;
@@ -228,58 +235,43 @@
       display: table-cell;
     }
   }
-  @media (min-width: 760px) {
-    .share {
-      display: table-cell;
-    }
-  }
-  /* phones: fixed column widths so long team names truncate instead of wrapping */
   @media (max-width: 639px) {
     .standings {
-      padding: 16px 6px 8px;
+      padding: 14px 4px 6px;
     }
     header {
-      padding: 0 10px 10px;
+      padding: 0 10px 8px;
     }
     table {
-      table-layout: fixed;
-      font-size: 14.5px;
+      font-size: 14px;
     }
     td,
     th {
       padding: 9px 3px;
     }
-    .pos {
-      width: 26px;
-      padding-left: 8px;
-    }
-    thead th:nth-child(4),
-    thead th:nth-child(5) {
-      width: 28px;
-    }
-    thead th:nth-child(8) {
-      width: 54px;
-    }
-    .pts,
-    thead th.pts {
-      width: 40px;
-      padding-right: 8px;
-    }
-    .games {
-      display: none;
-    }
-    .team {
-      width: auto;
-    }
     .team a {
-      gap: 9px;
-    }
-    .pill {
-      padding: 3px 7px;
-      font-size: 12px;
+      gap: 7px;
     }
     .pts {
       font-size: 16px;
+      padding-right: 8px;
+    }
+  }
+  /* narrow phones: the form says more than games behind */
+  @media (max-width: 420px) {
+    thead th:nth-child(6),
+    tbody td:nth-child(6) {
+      display: none;
+    }
+    .f {
+      width: 14px;
+      margin: 0;
+    }
+  }
+  @media (max-width: 340px) {
+    .formh,
+    .form {
+      display: none;
     }
   }
 </style>
