@@ -154,6 +154,8 @@ export function describe(group: ChangeGroup, entries: ChangeEntry[]): Described 
       const what = pa ? `${playerName(pa.new_data.player_id)}: ${res(pa.old_data?.result ?? pa.new_data.result)}` : 'pohyb běžců';
       return { title: `Smazána akce živého zápisu (${what})`, context: gameLabel(gameId), gameId };
     }
+    case 'live_delete_from':
+      return { title: 'Smazány akce živého zápisu od vybrané akce', context: gameLabel(gameId), gameId };
     case 'live_rewind':
       return { title: 'Živý zápis vrácen k dřívější akci', context: gameLabel(gameId), gameId };
     case 'admin_reset_game':

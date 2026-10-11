@@ -387,6 +387,10 @@ export const liveDeletePlay = (gameId: number, groupId: string) =>
 export const liveRewind = (gameId: number, groupId: string) =>
   call<number>('live_rewind', { p_game_id: gameId, p_group_id: groupId });
 
+/** Takes back this play and every later one (the state before this play); returns how many. */
+export const liveDeleteFrom = (gameId: number, groupId: string) =>
+  call<number>('live_delete_from', { p_game_id: gameId, p_group_id: groupId });
+
 export const liveAdjustRuns = (gameId: number, teamId: number, inning: number, playerId: string, delta: 1 | -1) =>
   call('live_adjust_runs', {
     p_game_id: gameId, p_team_id: teamId, p_inning: inning, p_player_id: playerId, p_delta: delta
