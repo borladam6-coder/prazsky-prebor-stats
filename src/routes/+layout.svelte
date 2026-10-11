@@ -29,6 +29,17 @@
 
   let searchOpen = $state(false);
 
+  /** height of the sticky site header, for things that stick right below it (--header-h) */
+  function measure(node: HTMLElement) {
+    const root = document.documentElement;
+    const ro = new ResizeObserver(() => {
+      const sticky = getComputedStyle(node).position === 'sticky';
+      root.style.setProperty('--header-h', `${sticky ? node.offsetHeight : 0}px`);
+    });
+    ro.observe(node);
+    return { destroy: () => ro.disconnect() };
+  }
+
   const isActive = (href: string) =>
     href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
 
@@ -62,7 +73,7 @@
 
 <a class="skip" href="#main">Přeskočit na obsah</a>
 
-<div class="top-wrap">
+<div class="top-wrap" use:measure>
   <header class="top">
     <a class="brand" href="/" aria-label="Pražský přebor, přehled">
       <img src={favicon} alt="" width="30" height="30" />
@@ -188,8 +199,8 @@
   .year {
     font-weight: 700;
     font-size: 12.5px;
-    color: var(--accent-text);
-    background: var(--accent-soft);
+    color: var(--muted);
+    background: var(--surface-3);
     border-radius: 999px;
     padding: 2px 9px;
   }
@@ -255,6 +266,12 @@
   }
   /* live scoring: the result pad takes the place of the menu */
   :global(html.has-dock) .nav-mobile {
+    display: none;
+  }
+  /* live scoring is a focused screen: only the game, no site header or footer */
+  :global(html.focus-mode) .top-wrap,
+  :global(html.focus-mode) .foot,
+  :global(html.focus-mode) .nav-mobile {
     display: none;
   }
 

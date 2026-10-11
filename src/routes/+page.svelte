@@ -1,23 +1,19 @@
 <script lang="ts">
-  // Overview at a glance: live games, the next game, latest results, top 3 batters, table.
+  // Overview at a glance: live games, the next game, latest results, leaderboards, table.
   import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
-  import { flip } from 'svelte/animate';
   import { league } from '#lib/league.svelte.ts';
   import { battingTotals, errorMessage } from '#lib/api.ts';
-  import { STATS, compareStat, type StatKey } from '#lib/stats.ts';
-  import { rate, num, plural, time } from '#lib/format.ts';
+  import { plural, time } from '#lib/format.ts';
   import type { Game, PlayerTotals } from '#lib/types.ts';
   import Standings from '#lib/components/Standings.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import Icon from '#lib/components/Icon.svelte';
   import LiveNow from '#lib/components/LiveNow.svelte';
+  import LeaderCards from '#lib/components/LeaderCards.svelte';
   import Skeleton from '#lib/components/Skeleton.svelte';
 
   let totals = $state<PlayerTotals[] | null>(null);
   let loadError = $state<string | null>(null);
-  const TOP_STATS: StatKey[] = ['avg', 'ops', 'h', 'hr', 'rbi'];
-  let stat = $state<StatKey>('avg');
   /** qualification for rate stats on the overview (the player list has its own setting) */
   const MIN_PA = 10;
 
@@ -32,16 +28,6 @@
 
   const seasonRunning = $derived(league.upcomingGames.length > 0);
 
-  // ---------------------------------------------------------------- top 3
-  const def = $derived(STATS[stat]);
-  const leaders = $derived.by(() => {
-    if (!totals) return [];
-    const pool = def.kind === 'rate' ? totals.filter((t) => t.pa >= MIN_PA) : totals;
-    return pool
-      .filter((t) => t[stat] !== null && Number(t[stat]) > 0)
-      .sort((a, b) => compareStat(a[stat], b[stat], -1))
-      .slice(0, 3);
-  });
 
   // ---------------------------------------------------------------- games
   const recent = $derived(league.playedGames.slice(0, 3));
@@ -168,45 +154,23 @@
       {/if}
     </section>
 
-    <!-- ------------------------------------------------ top 3 -->
-    <section class="card leaders rise" style:--i="4" aria-labelledby="leaders-title">
-      <div class="section-head">
-        <h2 id="leaders-title">Nejlepší pálkaři</h2>
-        <a class="link-accent" href="/hraci?sort={stat}">Všichni</a>
-      </div>
-      <div class="seg" role="group" aria-label="Statistika">
-        {#each TOP_STATS as k (k)}
-          <button type="button" aria-pressed={stat === k} title={STATS[k].title} onclick={() => (stat = k)}>{STATS[k].label}</button>
-        {/each}
-      </div>
-      {#if loadError}
-        <p class="empty">{loadError}</p>
-      {:else if totals === null}
-        <Skeleton rows={3} height={56} />
-      {:else if totals.length === 0}
-        <p class="muted none-small">Po prvním zápisu ze zápasu se tu objeví nejlepší pálkaři.</p>
-      {:else if leaders.length === 0}
-        <p class="muted none-small">Nikdo zatím nemá aspoň {MIN_PA} PA.</p>
-      {:else}
-        <ol class="list">
-          {#each leaders as l, i (l.player_id)}
-            {@const p = league.player(l.player_id)}
-            {@const team = league.team(l.team_id)}
-            <li animate:flip={{ duration: 260 }} in:fade={{ duration: 160 }} class:first={i === 0}>
-              <span class="rank">{i + 1}</span>
-              <TeamBadge {team} size={30} />
-              <a class="who" href="/hraci/{l.player_id}">
-                <span class="pname">{p?.name ?? 'Neznámý hráč'}</span>
-                <span class="pteam">{team?.short_name ?? team?.name}, {l.pa} PA</span>
-              </a>
-              <span class="val">{def.kind === 'rate' ? rate(l[stat]) : num(l[stat])}</span>
-            </li>
-          {/each}
-        </ol>
-        {#if def.kind === 'rate'}<p class="muted qual">Hráči s aspoň {MIN_PA} PA.</p>{/if}
-      {/if}
-    </section>
   </div>
+
+  <section class="leaders-sec rise" style:--i="4" aria-labelledby="leaders-title">
+    <div class="section-head">
+      <h2 id="leaders-title">Nejlepší pálkaři</h2>
+      <a class="link-accent" href="/hraci">Všichni hráči</a>
+    </div>
+    {#if loadError}
+      <p class="empty">{loadError}</p>
+    {:else if totals === null}
+      <Skeleton rows={3} height={56} />
+    {:else if totals.length === 0}
+      <p class="empty">Po prvním zápisu ze zápasu se tu objeví nejlepší pálkaři.</p>
+    {:else}
+      <LeaderCards {totals} minPa={MIN_PA} />
+    {/if}
+  </section>
 
   <div class="table-wrap">
     <Standings />
@@ -287,17 +251,6 @@
   @media (min-width: 720px) {
     .glance {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .leaders {
-      grid-column: 1 / -1;
-    }
-  }
-  @media (min-width: 1100px) {
-    .glance {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .leaders {
-      grid-column: auto;
     }
   }
   .glance > .card {
@@ -448,89 +401,17 @@
     color: var(--muted);
   }
   .rec {
-    color: var(--accent-text);
+    color: var(--muted);
     font-weight: 700;
   }
   .rec.ok {
-    color: var(--pos);
+    color: var(--hit);
   }
 
-  /* leaders */
-  .leaders .seg {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
+  .leaders-sec {
+    margin-top: 28px;
   }
-  .leaders .seg::-webkit-scrollbar {
-    display: none;
-  }
-  .leaders .seg button {
-    flex: 1 0 auto;
-  }
-  .list {
-    list-style: none;
-    margin: 12px 0 0;
-    padding: 0;
-  }
-  .list li {
-    display: grid;
-    grid-template-columns: 20px 30px 1fr auto;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 8px;
-    border-radius: 12px;
-  }
-  .list li.first {
-    background: var(--accent-soft);
-  }
-  .rank {
-    font-weight: 800;
-    color: var(--faint);
-    text-align: center;
-  }
-  .first .rank {
-    color: var(--accent-text);
-  }
-  .who {
-    display: grid;
-    min-width: 0;
-    text-decoration: none;
-  }
-  .pname {
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .who:hover .pname {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .pteam {
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .val {
-    font-weight: 800;
-    font-size: 22px;
-    letter-spacing: -0.02em;
-  }
-  .first .val {
-    color: var(--accent-text);
-  }
-  .qual {
-    margin: 8px 0 0;
-    font-size: 12.5px;
-  }
-  .none-small {
-    margin: 14px 0 0;
-    font-size: 14px;
-  }
-  .leaders :global(.skeleton-list) {
-    margin-top: 12px;
-  }
-
   .table-wrap {
-    margin-top: 14px;
+    margin-top: 28px;
   }
 </style>

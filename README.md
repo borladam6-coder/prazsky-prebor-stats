@@ -12,6 +12,11 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 17: nový vizuální jazyk podle rozboru GameChanger, PlayHQ, Apple Sports, FotMob a Baseball-Reference.
+  - Barvy mají jeden význam: žlutá jen na klepání a výběr, hit zeleně, BB/HBP modře, out tlumeně červeně, varování oranžově s ikonou, týmové barvy jen pro identitu.
+  - Živý zápis jako soustředěná obrazovka: bez hlavičky a menu webu, nahoře pořád viditelný scorebug (skóre, směna, mety, outy) a stav ukládání, Zpět s popisem („Zpět: Novák 2B“) a Znovu nad tlačítky výsledků, větší K a OUT, v průběhu jen poslední 3 akce.
+  - Zápasy po dnech v kompaktních řádcích, tiché přepínače, vysvětlivky pod „?“; detail zápasu se skóre po směnách (R H E), přilepenými záložkami a opravou s tlačítkem Vrátit.
+  - Tabulka ligy s pruhem týmu, PCT, GB a formou posledních 5 zápasů; žebříčky jako karty top 5; profil týmu s barevnou hlavičkou; percentily hráče v porovnání s ligou (min. 10 PA); tabulky se stínem zamrzlého sloupce, zvýrazněním řádku a vysvětlivkami zkratek.
 - Krok 16: OUT s prázdnými metami se dělí na Fly out a Ground out (jedno klepnutí), ruční zápis zase jde u týmu, jehož živý zápis byl smazaný nebo nemá žádné akce.
 - Krok 15: živý zápis se po dni zápasu sám ukončí (každou noc, znovu otevřít ho pak může jen správce), oprava akcí přímo v detailu zápasu (záložka Průběh, např. hit → error, u akce je vidět „opraveno · původně 2B“), filtr zápasů Se zápisem / Jen výsledek, import ze softball.cz jednou za 3 dny.
 - Krok 14: průběh zápasu jako oficiální play-by-play anglicky („Skokan Sváťa grounds into a double play to shortstop. Pevný Pavel forced out at 2nd. Skokan Sváťa out at 1st.“), souhrn každé poloviny směny (runs, hits, errors, LOB), přepínač Podrobný zápis (kam šel míček, line out / pop out, vždy jde „Neuvádět“).
@@ -30,7 +35,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 2. Klepáním na hráče ze soupisky sestav pořadí pálkařů (nebo **Pořadí z minulého zápasu**), pořadí změníš přetažením za úchyt. Dej **Začít zápis**.
 3. U pálkaře na řadě klepni na výsledek (na telefonu jsou tlačítka dole, podržením tlačítka se ukáže celý název). Když jsou mety prázdné, uloží se hned (u OUT se ještě vybere Fly out nebo Ground out, klepnutím se uloží). Když jsou na metách běžci, ukáže se, co se s nimi stalo. Výchozí návrh odpovídá běžnému průběhu, třeba singl posune jen vynucené běžce, takže 4 singly po sobě dají 1 bod. Stačí změnit, co bylo jinak, a dát **Uložit**.
 4. Klepnutím na běžce na diamantu zapíšeš ukradenou metu, postup bez odpalu nebo out běžce.
-5. **Zpět** vrátí poslední akci. **Pořadí a střídání** řeší náhradníky. V **Další možnosti** je Opravit stav (náhradní běžec, špatně zapsané outy), Ukončit zápis, Pohled diváka, Správa zápasu a nápověda.
+5. **Zpět** (nad tlačítky výsledků, s popisem akce) vrátí poslední akci, **Znovu** ji vrátí zpátky, dokud se stav nezměnil. **Pořadí a střídání** řeší náhradníky. V **Další možnosti** je Opravit stav (náhradní běžec, špatně zapsané outy), Ukončit zápis, Pohled diváka, Správa zápasu a nápověda.
 6. V režimu celého zápasu vrací Zpět poslední akci zápasu bez ohledu na tým.
 
 **Sestava:** standardně 9 pálkařů. Zaškrtnutím „Hrajeme v 10“ jde přidat desátého (extra hráč, EP). Víc než 10 databáze nepřijme.

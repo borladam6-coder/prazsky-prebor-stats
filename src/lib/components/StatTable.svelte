@@ -82,22 +82,36 @@
   const ariaSort = (key: string) =>
     sortKey === key ? (sortDir === 1 ? 'ascending' : 'descending') : 'none';
 
+  /** the first column casts a shadow once the numbers scroll under it */
+  let scrolled = $state(false);
+  /** tapped row stays highlighted, so the eye does not lose it while scrolling sideways */
+  let picked = $state<string | number | null>(null);
+  let glossary = $state(false);
+
   const show = (c: Column<T>, row: T) => (c.kind === 'rate' ? fmtRate(c.value(row) as number | null) : num(c.value(row) as number));
 </script>
 
 {#if rows.length === 0}
   <p class="empty">{empty}</p>
 {:else}
-  {#if reducible}
-    <div class="cols">
+  <div class="cols">
+    <button type="button" class="btn btn-quiet btn-sm" aria-expanded={glossary} onclick={() => (glossary = !glossary)} aria-label="Vysvětlivky zkratek">
+      <Icon name="help" size={16} /> Zkratky
+    </button>
+    {#if reducible}
       <button type="button" class="btn btn-quiet btn-sm" aria-pressed={tablePrefs.all} onclick={() => tablePrefs.toggle()}>
         <Icon name="tune" size={16} />
-        {tablePrefs.all ? 'Jen hlavní statistiky' : `Všechny statistiky (${columns.length})`}
+        {tablePrefs.all ? 'Jen hlavní' : `Všechny (${columns.length})`}
       </button>
-    </div>
+    {/if}
+  </div>
+  {#if glossary}
+    <dl class="gloss">
+      {#each columns as c (c.key)}<div><dt>{c.label}</dt><dd>{c.title ?? c.label}</dd></div>{/each}
+    </dl>
   {/if}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard-reachable) -->
-  <div class="wrap" role="region" aria-label={caption ?? nameLabel} tabindex="0">
+  <div class="wrap" class:scrolled role="region" aria-label={caption ?? nameLabel} tabindex="0" onscroll={(e) => (scrolled = e.currentTarget.scrollLeft > 2)}>
     <table>
       {#if caption}<caption class="visually-hidden">{caption}</caption>{/if}
       <thead>
@@ -120,11 +134,11 @@
         </tr>
       </thead>
       <tbody>
-        {#each sorted as row (rowKey(row))}
-          <tr animate:flip={{ duration: 280 }}>
+        {#each sorted as row, i (rowKey(row))}
+          <tr animate:flip={{ duration: 280 }} class:picked={picked === rowKey(row)} onclick={() => (picked = picked === rowKey(row) ? null : rowKey(row))}>
             <th scope="row" class="name">{@render name(row)}</th>
             {#each visible as c (c.key)}
-              <td class:active={sortKey === c.key} class:rate={c.kind === 'rate'}>{show(c, row)}</td>
+              <td class:active={sortKey === c.key} class:leader={i === 0 && sortKey === c.key && sorted.length > 2} class:rate={c.kind === 'rate'}>{show(c, row)}</td>
             {/each}
           </tr>
         {/each}
@@ -147,7 +161,30 @@
   .cols {
     display: flex;
     justify-content: flex-end;
+    gap: 2px;
     margin: -4px 0 6px;
+  }
+  .gloss {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 4px 16px;
+    margin: 0 0 10px;
+    padding: 12px 14px;
+    border-radius: var(--r-m);
+    background: var(--surface-2);
+    font-size: 13px;
+  }
+  .gloss div {
+    display: flex;
+    gap: 8px;
+  }
+  .gloss dt {
+    min-width: 34px;
+    font-weight: 800;
+  }
+  .gloss dd {
+    margin: 0;
+    color: var(--muted);
   }
   .wrap {
     overflow-x: auto;
@@ -234,9 +271,29 @@
     padding: 14px 10px 10px 16px;
   }
   td.active {
-    background: var(--surface-2);
     font-weight: 800;
     color: var(--ink);
+  }
+  td.leader::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: 2px;
+  }
+  /* the frozen first column casts a shadow over the numbers scrolling under it */
+  .scrolled .name {
+    box-shadow: 6px 0 8px -6px rgb(0 0 0 / 0.35);
+  }
+  tbody tr {
+    cursor: pointer;
+  }
+  tbody tr.picked th,
+  tbody tr.picked td {
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   }
   td {
     color: var(--muted);

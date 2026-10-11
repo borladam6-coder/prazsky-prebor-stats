@@ -1,6 +1,8 @@
 <script lang="ts">
-  // Play-by-play grouped by half-inning (newest first). With `onedit` every play gets
-  // an edit button (live scoring page); without it the log is read-only (watch page).
+  // Play-by-play grouped by half-inning (newest first). With `onedit` the whole row of a
+  // play opens its corrections; without it the log is read-only (watch page).
+  // `limit` shows only the newest plays (live scoring); the half-inning totals stay complete.
+  // `sticky` keeps the half-inning header under the site header while scrolling.
   import { fly } from 'svelte/transition';
   import { league } from '../league.svelte.ts';
   import { resultDef } from '../stats.ts';
@@ -13,14 +15,29 @@
   let {
     plays,
     awayTeamId,
-    onedit = undefined
+    onedit = undefined,
+    limit = undefined,
+    sticky = false
   }: {
     plays: PlayItem[];
     awayTeamId: number | undefined;
     onedit?: (p: PlayItem) => void;
+    limit?: number;
+    sticky?: boolean;
   } = $props();
 
-  const halves = $derived(byHalfInning(plays));
+  const halves = $derived.by(() => {
+    const all = byHalfInning(plays).map((h) => ({ ...h, all: h.plays }));
+    if (!limit) return all;
+    let left = limit;
+    const out: typeof all = [];
+    for (const h of all) {
+      if (left <= 0) break;
+      out.push({ ...h, plays: h.plays.slice(0, left) });
+      left -= h.plays.length;
+    }
+    return out;
+  });
   const name = (pid: string | null) => league.player(pid)?.name ?? '?';
   const short = (pid: string | null) => name(pid).split(' ')[0];
   const summary = (plays: PlayItem[]) => halfSummary([...plays].reverse());
@@ -31,9 +48,9 @@
 {:else}
   {#each halves as h (h.key)}
     {@const t = league.team(h.teamId)}
-    {@const sum = summary(h.plays)}
+    {@const sum = summary(h.all)}
     <div class="half" style:--team={t?.color}>
-      <header>
+      <header class:sticky>
         <span class="hn">{h.inning}. směna {h.teamId === awayTeamId ? '▲' : '▼'}</span>
         <span class="ht"><TeamBadge team={t} size={18} /> {t?.short_name ?? ''}</span>
         {#if h.runs}<span class="pill {h.runs > 0 ? 'pos' : 'neg'}">{h.runs > 0 ? '+' : '−'}{Math.abs(h.runs)} {plural(Math.abs(h.runs), ['run', 'runs', 'runs'])}</span>{/if}
@@ -41,6 +58,14 @@
       <ol>
         {#each h.plays as p (p.id)}
           <li class:adjust={p.kind === 'adjust'} class:gone={p.paDeleted} in:fly={{ y: -8, duration: 220 }}>
+            <svelte:element
+              this={onedit ? 'button' : 'div'}
+              class="row"
+              type={onedit ? 'button' : undefined}
+              aria-label={onedit ? 'Upravit akci' : undefined}
+              onclick={onedit ? () => onedit(p) : undefined}
+              role={onedit ? undefined : 'group'}
+            >
             {#if p.kind === 'adjust'}
               <span class="chip g-fix">OPR</span>
               <span class="desc">
@@ -51,7 +76,7 @@
                 </span>
               </span>
             {:else}
-              <span class="chip g-{p.result ? resultDef(p.result)?.group : 'run'}">{p.result ?? 'SB'}</span>
+              <span class="chip g-{p.result ? resultDef(p.result)?.group : 'run'}">{p.result ?? (p.stole.length ? 'SB' : 'RUN')}</span>
               <span class="desc">
                 {#if p.detail && !p.paDeleted}
                   <span class="story">{narrate(p.detail, p.result, name)}</span>
@@ -61,7 +86,7 @@
                   <strong>Pohyb běžců</strong>
                 {/if}
                 <span class="extra">
-                  {#if p.edited}<span class="tag">opraveno · původně {p.recordedResult !== p.result ? p.recordedResult : `${p.recordedRbi} RBI`}</span>{/if}
+                  {#if p.edited}<span class="tag"><Icon name="history" size={13} /> opraveno · původně {p.recordedResult !== p.result ? p.recordedResult : `${p.recordedRbi} RBI`}</span>{/if}
                   {#if p.paDeleted}<span class="tag">zápis smazán</span>{/if}
                   {#if !p.detail && p.stole.length}<span>stolen base: {p.stole.map(short).join(', ')}</span>{/if}
                   {#if !p.detail && p.scored.length}<span class="sc">run: {p.scored.map(short).join(', ')}</span>{/if}
@@ -71,11 +96,10 @@
               </span>
             {/if}
             <span class="right">
-              {#if p.runs}<span class="plus" class:minus={p.runs < 0}>{p.runs > 0 ? '+' : '−'}{Math.abs(p.runs)}</span>{/if}
-              {#if onedit}
-                <button type="button" class="edit" aria-label="Upravit akci" onclick={() => onedit(p)}><Icon name="pencil" size={16} /></button>
-              {/if}
+              {#if p.runs}<span class="plus num-c" class:minus={p.runs < 0}>{p.runs > 0 ? '+' : '−'}{Math.abs(p.runs)}</span>{/if}
+              {#if onedit}<span class="edit" aria-hidden="true"><Icon name="chevron" size={16} /></span>{/if}
             </span>
+            </svelte:element>
           </li>
         {/each}
       </ol>
@@ -95,15 +119,22 @@
     border-radius: var(--r-l);
     background: var(--surface);
     border: 1px solid var(--line);
-    overflow: hidden;
   }
   header {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--team) 18%, transparent), transparent 70%);
+    border-radius: var(--r-l) var(--r-l) 0 0;
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--team) 18%, transparent), transparent 70%),
+      var(--surface);
     border-bottom: 1px solid var(--line);
+  }
+  header.sticky {
+    position: sticky;
+    top: var(--header-h, 0px);
+    z-index: 2;
   }
   .hn {
     font-weight: 800;
@@ -119,17 +150,34 @@
   ol {
     list-style: none;
     margin: 0;
-    padding: 4px 0;
+    padding: 2px 0;
   }
-  li {
+  li + li {
+    border-top: 1px solid var(--line);
+  }
+  .row {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr) auto;
     align-items: start;
     gap: 10px;
-    padding: 9px 10px 9px 14px;
+    width: 100%;
+    padding: 10px 10px 10px 14px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
   }
-  li + li {
-    border-top: 1px dashed var(--line);
+  button.row {
+    cursor: pointer;
+    transition: background-color 140ms;
+  }
+  button.row:hover,
+  button.row:focus-visible {
+    background: var(--surface-2);
+  }
+  li:last-child button.row {
+    border-radius: 0 0 var(--r-l) var(--r-l);
   }
   li.gone .desc strong {
     text-decoration: line-through;
@@ -147,16 +195,20 @@
     color: var(--muted);
   }
   .g-hit {
-    background: var(--pos-soft);
-    color: var(--pos);
+    background: var(--hit-soft);
+    color: var(--hit);
   }
   .g-onbase {
-    background: var(--accent-soft);
-    color: var(--accent-text);
+    background: var(--onbase-soft);
+    color: var(--onbase);
+  }
+  .g-out {
+    background: var(--out-soft);
+    color: var(--out);
   }
   .g-run {
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent-text);
+    background: var(--surface-3);
+    color: var(--ink);
   }
   .g-fix {
     background: transparent;
@@ -183,6 +235,7 @@
     gap: 4px 14px;
     padding: 8px 14px 10px;
     border-top: 1px solid var(--line);
+    border-radius: 0 0 var(--r-l) var(--r-l);
     background: var(--surface-2);
     font-size: 12.5px;
     color: var(--muted);
@@ -202,47 +255,41 @@
     display: none;
   }
   .sc {
-    color: var(--pos);
+    color: var(--hit);
     font-weight: 700;
   }
   .out {
-    color: var(--neg);
+    color: var(--out);
     font-weight: 600;
   }
   .end {
-    color: var(--neg);
+    color: var(--out);
     font-weight: 800;
   }
   .tag {
-    color: var(--accent-text);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
     font-weight: 700;
   }
   .right {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    align-self: center;
   }
   .plus {
     font-weight: 800;
-    font-size: 18px;
-    color: var(--pos);
+    font-size: 19px;
+    color: var(--hit);
   }
   .plus.minus {
-    color: var(--neg);
+    color: var(--out);
   }
   .edit {
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 1px solid var(--line);
-    background: var(--surface-2);
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .edit:hover {
-    color: var(--ink);
-    border-color: var(--line-strong);
+    color: var(--faint);
   }
 </style>
