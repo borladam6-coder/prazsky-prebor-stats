@@ -10,6 +10,8 @@
   import { TEST_GAME_ID } from '#lib/testgame.ts';
 
   type View = 'odehrane' | 'nadchazejici' | 'vse';
+  /** games with our own statistics (live or entered) vs. only the result from softball.cz */
+  type Record = 'vse' | 'ano' | 'ne';
 
   onMount(() => {
     league.loadRecorded().catch(() => {});
@@ -17,6 +19,7 @@
 
   const teamId = $derived(Number(page.url.searchParams.get('tym')) || null);
   const view = $derived((page.url.searchParams.get('stav') as View) || 'odehrane');
+  const record = $derived((page.url.searchParams.get('zapis') as Record) || 'vse');
 
   function setParam(key: string, value: string | null) {
     const url = new URL(page.url.href);
@@ -29,6 +32,10 @@
     let list = league.games.filter((g) => !teamId || g.home_team_id === teamId || g.away_team_id === teamId);
     if (view === 'odehrane') list = list.filter((g) => g.status === 'played');
     if (view === 'nadchazejici') list = list.filter((g) => g.status !== 'played');
+    if (view !== 'nadchazejici' && record !== 'vse') {
+      const want = record === 'ano';
+      list = list.filter((g) => (league.recorded.get(g.id) ?? 0) > 0 === want && (want || g.status === 'played'));
+    }
     const dir = view === 'nadchazejici' ? 1 : -1;
     return [...list].sort((a, b) => (a.starts_at ?? '9999').localeCompare(b.starts_at ?? '9999') * dir);
   });
@@ -49,6 +56,11 @@
     { id: 'nadchazejici', label: 'Nadcházející' },
     { id: 'vse', label: 'Vše' }
   ];
+  const records: { id: Record; label: string }[] = [
+    { id: 'vse', label: 'Všechny' },
+    { id: 'ano', label: 'Se zápisem' },
+    { id: 'ne', label: 'Jen výsledek' }
+  ];
 </script>
 
 <svelte:head>
@@ -57,7 +69,7 @@
 
 <div class="page">
   <h1>Zápasy</h1>
-  <p class="lead muted">Vyber odehraný zápas, otevře se jeho box score a dají se do něj zapisovat statistiky.</p>
+  <p class="lead muted">Vyber odehraný zápas, otevře se jeho box score a dají se do něj zapisovat statistiky. „Se zápisem“ jsou zápasy, kde někdo zapsal statistiky, „Jen výsledek“ mají jen výsledek ze softball.cz.</p>
 
   {#if league.game(TEST_GAME_ID)}
     <a class="card try" href="/zapasy/{TEST_GAME_ID}/zive">
@@ -79,6 +91,16 @@
       {/each}
     </div>
 
+    {#if view !== 'nadchazejici'}
+      <div class="seg views" role="group" aria-label="Statistiky zápasu">
+        {#each records as r (r.id)}
+          <button type="button" aria-pressed={record === r.id} onclick={() => setParam('zapis', r.id === 'vse' ? null : r.id)}>
+            {r.label}
+          </button>
+        {/each}
+      </div>
+    {/if}
+
     <div class="teams" role="group" aria-label="Tým">
       <button type="button" class="chip" aria-pressed={teamId === null} onclick={() => setParam('tym', null)}>Všechny týmy</button>
       {#each league.teams as t (t.id)}
@@ -91,7 +113,7 @@
   </div>
 
   {#if groups.length === 0}
-    <p class="empty">Žádné zápasy pro tento výběr.</p>
+    <p class="empty">{record !== 'vse' && !league.recordedLoaded ? 'Načítám…' : 'Žádné zápasy pro tento výběr.'}</p>
   {:else}
     {#each groups as grp (grp.label)}
       <section class="month">

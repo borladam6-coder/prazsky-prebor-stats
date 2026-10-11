@@ -4,7 +4,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 - **Frontend:** SvelteKit (statický web), hosting Netlify
 - **Databáze:** Supabase (Postgres s Row Level Security)
-- **Import:** Netlify funkce každých 6 hodin stáhne ze softball.cz týmy, soupisky, rozpis, výsledky a tabulku Hráče ze soupisky svazu načte jen jednou na začátku sezóny (pro každý tým, který ještě žádné hráče nemá). Potom soupisku spravuje jen web: import nikoho nepřidá, nepřejmenuje ani neskryje, protože hrát může kdokoli, kdo přijde.
+- **Import:** Netlify funkce jednou za 3 dny (v noci) stáhne ze softball.cz týmy, soupisky, rozpis, výsledky a tabulku Hráče ze soupisky svazu načte jen jednou na začátku sezóny (pro každý tým, který ještě žádné hráče nemá). Potom soupisku spravuje jen web: import nikoho nepřidá, nepřejmenuje ani neskryje, protože hrát může kdokoli, kdo přijde.
 
 ## Stav
 
@@ -12,6 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 15: živý zápis se po dni zápasu sám ukončí (každou noc, znovu otevřít ho pak může jen správce), oprava akcí přímo v detailu zápasu (záložka Průběh, např. hit → error, u akce je vidět „opraveno · původně 2B“), filtr zápasů Se zápisem / Jen výsledek, import ze softball.cz jednou za 3 dny.
 - Krok 14: průběh zápasu jako oficiální play-by-play anglicky („Skokan Sváťa grounds into a double play to shortstop. Pevný Pavel forced out at 2nd. Skokan Sváťa out at 1st.“), souhrn každé poloviny směny (runs, hits, errors, LOB), přepínač Podrobný zápis (kam šel míček, line out / pop out, vždy jde „Neuvádět“).
 - Krok 13: softballové termíny všude anglicky (double play, fly out, stolen base, runs, G/W/L/PCT v tabulce …), i v hláškách databáze.
 - Krok 12: chytrý zápis outů (Out v poli → fly out / ground out / fielder’s choice / double play / sacrifice bunt; SF, SH, FC a RBI se odvodí samy), běžcům se nabízí jen možné mety a posun běžce posune i ty před ním, soupisky ze svazu jen na začátku sezóny, značka „Skóre nesedí“ u zápasů, kde zápis nesedí s výsledkem svazu.
@@ -49,7 +50,9 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Sledovat** (z přehledu, detailu zápasu nebo výběru na stránce živého zápisu) otevře pohled jen pro diváky: skóre, směna a outy, diamant s běžci, kdo je na pálce, skóre po směnách, průběh zápasu po polovinách směn a sestavy s dnešními výsledky. Aktualizuje se sám.
 
-**Opravy:** v živém zápisu je u každé akce v Průběhu zápasu tužka. U poslední akce: Smazat akci (vše se vrátí přesně do stavu před ní, i běžci, outy a pálkař na řadě) nebo Zapsat znovu. U starší akce: Smazat od této akce (smaže ji i všechny pozdější) nebo Vrátit zápis sem. Výsledek a RBI jde opravit jen na hodnoty, které sedí na to, co se stalo na metách. Doběh jde přidat nebo odebrat v dané směně. Zpět funguje i po opravách, střídání a korekci doběhů. Všechno je v historii a dá se vrátit.
+**Automatické ukončení:** každou noc (po půlnoci pražského času) Netlify funkce close-live ukončí živé zápisy zápasů z předchozích dnů, ve kterých se od včerejška nic nezapsalo. V historii je to vidět jako „Živý zápis ukončen automaticky po dni zápasu“. Po dni zápasu může ukončený zápis znovu otevřít jen správce (s odemčenou Správou zápasu se na stránce živého zápisu ukáže Otevřít znovu). Testovací zápas se neukončuje.
+
+**Opravy:** v detailu zápasu je záložka **Průběh** (u zápasů se živým zápisem) a v živém zápisu je u každé akce v Průběhu zápasu tužka. U poslední akce: Smazat akci (vše se vrátí přesně do stavu před ní, i běžci, outy a pálkař na řadě) nebo Zapsat znovu. U starší akce: Smazat od této akce (smaže ji i všechny pozdější) nebo Vrátit zápis sem. Výsledek a RBI jde opravit jen na hodnoty, které sedí na to, co se stalo na metách. Doběh jde přidat nebo odebrat v dané směně. Zpět funguje i po opravách, střídání a korekci doběhů. Opravená akce má štítek „opraveno · původně 2B“. Opravy jdou i po ukončení zápisu a po dni zápasu, zápis při nich zůstává ukončený. Všechno je v historii a dá se vrátit.
 
 **Správce** (dole v detailu zápasu → Správa zápasu, odemyká se kódem správce): ruční konečné skóre (import ho nepřepíše) a smazání celého záznamu zápasu. Změny správce může vrátit jen správce. V databázi je jen bcrypt hash kódu (`private.settings.admin_code_hash`). Kód jde změnit přímo na webu. Při zapomenutí ho nastaví nový hash v SQL Editoru: `update private.settings set admin_code_hash = extensions.crypt('NOVYKOD', extensions.gen_salt('bf', 8));` (kód bez pomlček, velkými písmeny, aspoň 4 znaky).
 
@@ -62,6 +65,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/011_autofinish.sql  automatické ukončení živého zápisu po dni zápasu, znovuotevření jen správcem
 supabase/migrations/010_play_details.sql  podrobnosti akcí pro play-by-play (druh, místo, běžci)
 supabase/migrations/009_english_terms.sql  softballové termíny v hláškách anglicky
 supabase/migrations/008_import_rosters_once.sql  soupisky ze svazu jen jako výchozí seznam
@@ -69,7 +73,8 @@ supabase/migrations/007_exact_undo.sql  vrácení akce = přesně stav před ní
 supabase/migrations/006_lineup_admin_testgame.sql  sestava 9/10, krátký kód správce, testovací zápas
 supabase/migrations/005_offline_and_manual_lock.sql  zápis bez signálu (akce jen jednou), zámek ručního zápisu, „out“ ve zprávách
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
-netlify/functions/import-league.mts plánovaný import ze softball.cz
+netlify/functions/import-league.mts plánovaný import ze softball.cz (jednou za 3 dny)
+netlify/functions/close-live.mts   každou noc ukončí živé zápisy po dni zápasu
 netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
 src/routes/                        stránky: přehled, zápasy, týmy, hráči, historie
 src/lib/                           data, formátování, logika živého zápisu (live.ts), věty play-by-play (narrate.ts), komponenty
@@ -85,7 +90,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql` a `010_play_details.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql`, `010_play_details.sql` a `011_autofinish.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`
@@ -111,7 +116,7 @@ Vytvoř prázdný repozitář (např. `prazsky-prebor-stats`) a nahraj do něj t
    Volbu „Contains secret values“ zaškrtni **jen** u `SUPABASE_SECRET_KEY`. Při importu z .env platí pro všechny vkládané proměnné najednou, proto secret key přidej zvlášť (Add a single variable). Kdyby byly jako tajné označené i ostatní, Netlify najde jejich hodnoty v kódu webu a build zastaví.
 
 3. Spusť **Deploy**.
-4. Po deployi otevři v Netlify sekci **Functions → import-league** a klikni **Run now**. Tím proběhne první import, další už běží samy každých 6 hodin.
+4. Po deployi otevři v Netlify sekci **Functions → import-league** a klikni **Run now**. Tím proběhne první import, další už běží samy jednou za 3 dny. Funkce **close-live** běží každou noc a ukončí živé zápisy, které zůstaly otevřené po dni zápasu.
 5. Otevři web. Kontrolní stránka má ukázat 10 týmů, zápasy a hráče.
 
 ## Kontrola konzistence

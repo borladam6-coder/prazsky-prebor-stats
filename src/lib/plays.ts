@@ -32,6 +32,9 @@ export interface PlayItem {
   paId: string | null;
   /** result or RBI changed after the play was recorded */
   edited: boolean;
+  /** result and RBI as recorded with the play (before any correction) */
+  recordedResult: PaResult | null;
+  recordedRbi: number;
   /** the plate appearance was deleted later */
   paDeleted: boolean;
   /** runs taken away by a correction */
@@ -82,7 +85,7 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
       const player = String(a.player_id);
       const delta = num(a.delta);
       plays.push({
-        id: g.id, kind: 'adjust', paId: null, edited: false, paDeleted: false,
+        id: g.id, kind: 'adjust', paId: null, edited: false, recordedResult: null, recordedRbi: 0, paDeleted: false,
         at: g.at, actor: g.actor_name, teamId: num(a.team_id), inning: num(a.inning),
         outsBefore: 0, outsAfter: 0, inningEnded: false, batter: null, batterTo: null, result: null, rbi: 0,
         scored: delta > 0 ? [player] : [], removed: delta < 0 ? [player] : [], stole: [], runs: delta, outs: 0, detail: null
@@ -123,6 +126,8 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
       kind: 'play',
       paId,
       edited: !!now && !now.deleted && (now.result !== recorded || now.rbi !== recordedRbi),
+      recordedResult: recorded,
+      recordedRbi,
       // a plate appearance missing from the current list was deleted later
       paDeleted: !!paId && !!current && (!now || now.deleted),
       removed: [],

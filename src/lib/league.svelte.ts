@@ -37,6 +37,8 @@ class League {
   recorded = $state<Map<number, number>>(new Map());
   /** game id → team id → runs in our box score */
   recordedRuns = $state<Map<number, Map<number, number>>>(new Map());
+  /** loadRecorded() has finished at least once */
+  recordedLoaded = $state(false);
   status = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
   error = $state<string | null>(null);
 
@@ -207,6 +209,7 @@ class League {
     }
     this.recorded = m;
     this.recordedRuns = runs;
+    this.recordedLoaded = true;
   }
 
   /** Replaces or adds one player after a write (keeps the list sorted by name). */

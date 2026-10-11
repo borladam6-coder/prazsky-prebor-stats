@@ -122,7 +122,7 @@ function describeEntry(e: ChangeEntry): string {
 }
 
 export function describe(group: ChangeGroup, entries: ChangeEntry[]): Described {
-  if (group.source === 'import') {
+  if (group.source === 'import' && group.action !== 'live_autofinish') {
     return { title: 'Import ze softball.cz (soupisky)', context: null, gameId: null };
   }
   const main = entries.filter((e) => !e.is_derived);
@@ -141,6 +141,8 @@ export function describe(group: ChangeGroup, entries: ChangeEntry[]): Described 
       return { title: `Oprava stavu živého zápisu (${team})`, context: gameLabel(gameId), gameId };
     case 'live_finish':
       return { title: `Konec živého zápisu (${team})`, context: gameLabel(gameId), gameId };
+    case 'live_autofinish':
+      return { title: `Živý zápis ukončen automaticky po dni zápasu (${team})`, context: gameLabel(gameId), gameId };
     case 'live_reopen':
       return { title: `Pokračování živého zápisu (${team})`, context: gameLabel(gameId), gameId };
     case 'live_adjust': {

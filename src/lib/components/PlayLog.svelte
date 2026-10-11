@@ -61,7 +61,7 @@
                   <strong>Pohyb běžců</strong>
                 {/if}
                 <span class="extra">
-                  {#if p.edited}<span class="tag">upraveno</span>{/if}
+                  {#if p.edited}<span class="tag">opraveno · původně {p.recordedResult !== p.result ? p.recordedResult : `${p.recordedRbi} RBI`}</span>{/if}
                   {#if p.paDeleted}<span class="tag">zápis smazán</span>{/if}
                   {#if !p.detail && p.stole.length}<span>stolen base: {p.stole.map(short).join(', ')}</span>{/if}
                   {#if !p.detail && p.scored.length}<span class="sc">run: {p.scored.map(short).join(', ')}</span>{/if}

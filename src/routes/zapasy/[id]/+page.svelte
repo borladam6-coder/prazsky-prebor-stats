@@ -6,8 +6,10 @@
   import { supabase } from '#lib/supabase.ts';
   import {
     gameLines, gameEntries, addPlateAppearance, updatePlateAppearance, deletePlateAppearance,
-    bumpStat, addPlayer, errorMessage, WriteCancelled, liveOfGame, LIVE_STALE_MS
+    bumpStat, addPlayer, errorMessage, WriteCancelled, liveOfGame, LIVE_STALE_MS, gamePlayLog
   } from '#lib/api.ts';
+  import type { PlayItem } from '#lib/plays.ts';
+  import GamePlays from '#lib/components/GamePlays.svelte';
   import { statColumns } from '#lib/columns.ts';
   import { BOX_STATS, RESULTS, resultDef } from '#lib/stats.ts';
   import { longDate, time } from '#lib/format.ts';
@@ -53,9 +55,15 @@
   let loaded = $state(false);
   let loadError = $state<string | null>(null);
 
-  let tab = $state<'box' | 'entry' | 'history'>(
-    page.url.searchParams.has('zapis') ? 'entry' : page.url.searchParams.has('historie') ? 'history' : 'box'
+  let tab = $state<'box' | 'plays' | 'entry' | 'history'>(
+    page.url.searchParams.has('zapis') ? 'entry'
+    : page.url.searchParams.has('historie') ? 'history'
+    : page.url.searchParams.has('prubeh') ? 'plays'
+    : 'box'
   );
+  /** play-by-play of the live scoring (empty when the game was not scored live) */
+  let plays = $state<PlayItem[]>([]);
+  const hasPlays = $derived(plays.length > 0);
   let entryTeamId = $state<number | null>(null);
   let openPlayer = $state<string | null>(null);
   let busy = $state(false);
@@ -73,6 +81,7 @@
       pas = e.pas;
       extras = e.extras;
       live = lv.sessions;
+      plays = lv.sessions.length ? await gamePlayLog(id, e.pas).catch(() => [] as PlayItem[]) : [];
       loadError = null;
     } catch (e) {
       loadError = errorMessage(e);
@@ -90,6 +99,7 @@
       pas = [];
       extras = [];
       live = [];
+      plays = [];
       openPlayer = null;
       entryTeamId = league.game(gameId)?.home_team_id ?? null;
       load();
@@ -109,6 +119,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plate_appearances', filter: `game_id=eq.${gameId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_player_extras', filter: `game_id=eq.${gameId}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_sessions', filter: `game_id=eq.${gameId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_run_adjustments', filter: `game_id=eq.${gameId}` }, refresh)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -278,7 +289,10 @@
 
     <div class="seg tabs" role="tablist" aria-label="Části zápasu">
       <button type="button" role="tab" aria-selected={tab === 'box'} onclick={() => (tab = 'box')}>Box score</button>
-      <button type="button" role="tab" aria-selected={tab === 'entry'} onclick={() => (tab = 'entry')}>Zapsat statistiky</button>
+      {#if hasPlays}
+        <button type="button" role="tab" aria-selected={tab === 'plays'} onclick={() => (tab = 'plays')}>Průběh</button>
+      {/if}
+      <button type="button" role="tab" aria-selected={tab === 'entry'} onclick={() => (tab = 'entry')}>{hasPlays ? 'Zapsat' : 'Zapsat statistiky'}</button>
       <button type="button" role="tab" aria-selected={tab === 'history'} onclick={() => (tab = 'history')}>Historie</button>
     </div>
 
@@ -319,6 +333,14 @@
           </section>
         {/each}
       </div>
+    {:else if tab === 'plays'}
+      <div in:fade={{ duration: 150 }}>
+        {#if hasPlays}
+          <GamePlays gameId={id} awayTeamId={game.away_team_id} {plays} {pas} onchanged={async () => { await load(); historyList?.reload(); }} />
+        {:else}
+          <p class="empty">Zápas nemá živý zápis, průběh není k dispozici.</p>
+        {/if}
+      </div>
     {:else if tab === 'entry'}
       <div in:fade={{ duration: 150 }}>
         {#if !playable}
@@ -341,7 +363,11 @@
               <div>
                 <strong>{entryTeam?.short_name ?? entryTeam?.name} má živý zápis</strong>
                 <p class="muted">Statistiky tohoto týmu vznikly ze živého zápisu. Opravují se v průběhu zápasu (tužkou u akce), aby seděly runs i pořadí.</p>
-                <a class="btn btn-primary btn-sm" href="/zapasy/{id}/zive?rezim=tym&tym={entryTeamId}"><Icon name="pencil" size={16} /> Opravit v živém zápisu</a>
+                {#if hasPlays}
+                  <button type="button" class="btn btn-primary btn-sm" onclick={() => (tab = 'plays')}><Icon name="pencil" size={16} /> Opravit v průběhu zápasu</button>
+                {:else}
+                  <a class="btn btn-primary btn-sm" href="/zapasy/{id}/zive?rezim=tym&tym={entryTeamId}"><Icon name="pencil" size={16} /> Opravit v živém zápisu</a>
+                {/if}
               </div>
             </div>
           {:else}

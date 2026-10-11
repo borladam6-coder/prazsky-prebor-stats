@@ -251,7 +251,14 @@ test('manual state correction, finish and reopen', async () => {
   await t.rpc(c, 'live_finish', { p_game_id: game.id, p_team_id: game.home_team_id, p_expected_version: s.version, p_finished: true });
   await expectError(play({ result: 'K', batterTo: 0, runners: [{ from: 3, to: 3 }] }), /ukončený/);
   s = await session();
-  await t.rpc(c, 'live_finish', { p_game_id: game.id, p_team_id: game.home_team_id, p_expected_version: s.version, p_finished: false });
+  // the game was played on an earlier day: only the administrator continues (migration 011)
+  await t.q(`update games set starts_at = now() - interval '3 days' where id = $1`, [game.id]);
+  await expectError(
+    t.rpc(c, 'live_finish', { p_game_id: game.id, p_team_id: game.home_team_id, p_expected_version: s.version, p_finished: false }),
+    /jen správce/
+  );
+  await t.q(`update private.settings set admin_code_hash = extensions.crypt('ADMIN', extensions.gen_salt('bf', 4))`);
+  await t.rpc(c, 'admin_live_reopen', { p_game_id: game.id, p_team_id: game.home_team_id, p_code: 'admin' });
   await play({ result: 'K', batterTo: 0, runners: [{ from: 3, to: 3 }] });
   assert.equal((await session()).outs, 2);
 });

@@ -230,7 +230,7 @@
           {/each}
         </ul>
         <p class="note muted">
-          Soupisky se každých 6 hodin přebírají ze softball.cz. Ruční úpravy import nepřepíše. Vyřazený hráč zůstává ve statistikách.
+          Soupiska se ze softball.cz načte jen na začátku sezóny, pak ji spravuje web. Vyřazený hráč zůstává ve statistikách.
         </p>
       </div>
     {/if}

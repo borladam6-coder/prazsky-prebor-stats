@@ -180,6 +180,7 @@ test('editing a result is shown in the play log as edited', async () => {
   const p = (await playLog()).find((x) => x.paId === pa.id)!;
   assert.equal(p.result, '2B');
   assert.equal(p.edited, true);
+  assert.equal(p.recordedResult, '3B', 'what was recorded first');
 });
 
 test('final score override: admin only, revertable only by the admin', async () => {
