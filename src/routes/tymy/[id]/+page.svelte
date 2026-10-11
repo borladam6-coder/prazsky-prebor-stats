@@ -9,7 +9,6 @@
   import { statColumns } from '#lib/columns.ts';
   import { TABLE_STATS } from '#lib/stats.ts';
   import { toasts } from '#lib/toast.svelte.ts';
-  import { rate } from '#lib/format.ts';
   import type { Player, PlayerTotals, TeamTotals } from '#lib/types.ts';
   import StatTable from '#lib/components/StatTable.svelte';
   import Skeleton from '#lib/components/Skeleton.svelte';
@@ -147,12 +146,10 @@
       <div>
         <h1>{team.name}</h1>
         {#if standing}
-          <dl class="facts">
-            <div><dt>Místo</dt><dd class="num-c">{standing.position}.</dd></div>
-            <div><dt>W–L</dt><dd class="num-c">{standing.wins}–{standing.losses}{standing.draws ? `–${standing.draws}` : ''}</dd></div>
-            <div><dt>PCT</dt><dd class="num-c">{rate(standing.games ? standing.wins / standing.games : null)}</dd></div>
-            <div><dt>RS:RA</dt><dd class="num-c">{standing.runs_for}:{standing.runs_against}</dd></div>
-          </dl>
+          <p class="rec">
+            <span class="pos">{standing.position}.</span> místo, {standing.wins} W, {standing.losses} L{standing.draws ? `, ${standing.draws} T` : ''},
+            skóre {standing.runs_for}:{standing.runs_against}
+          </p>
         {/if}
       </div>
     </header>
@@ -253,39 +250,25 @@
   .back:hover {
     color: var(--ink);
   }
-  /* the one place where the team colour leads */
   .head {
     display: flex;
     align-items: center;
     gap: 20px;
     padding: 24px;
     background:
-      linear-gradient(135deg, color-mix(in srgb, var(--team) 38%, transparent), color-mix(in srgb, var(--team) 8%, transparent) 60%, transparent),
+      radial-gradient(70% 160% at 0% 0%, color-mix(in srgb, var(--team) 26%, transparent), transparent 60%),
       var(--surface);
-    border-color: color-mix(in srgb, var(--team) 30%, var(--line));
-  }
-  .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 22px;
-    margin: 14px 0 0;
-  }
-  .facts div {
-    display: grid;
-  }
-  .facts dt {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--muted);
-  }
-  .facts dd {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 800;
-    line-height: 1.1;
   }
   .head h1 {
     font-size: clamp(30px, 6vw, 52px);
+  }
+  .rec {
+    margin: 10px 0 0;
+    color: var(--muted);
+  }
+  .pos {
+    font-weight: 800;
+    color: var(--accent-text);
   }
   .tabs {
     margin: 18px 0 20px;

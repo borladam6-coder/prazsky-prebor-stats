@@ -14,7 +14,7 @@
   import { admin } from '#lib/admin.svelte.ts';
   import { PlayQueue } from '#lib/queue.svelte.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
-  import { defaultPlay, runsOn, validatePlay, type Base, type Bases, type Play } from '#lib/live.ts';
+  import { defaultPlay, runsOn, type Base, type Bases, type Play } from '#lib/live.ts';
   import { battingTeam } from '#lib/plays.ts';
   import { outsWord, plural, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
@@ -404,29 +404,9 @@
     return runs ? `${head} · +${runs} ${plural(runs, ['run', 'runs', 'runs'])}` : head;
   }
 
-  // ------------------------------------------------------------ Zpět / Znovu
-  /** plays recorded on this device (newest last): what Znovu can put back after Zpět */
-  type Done = { play: Play; batterId: string | null; teamId: number; label: string };
-  let done: Done[] = [];
-  let redoStack = $state<Done[]>([]);
-  const shortName = (pid: string | null | undefined) => league.player(pid)?.name.split(' ')[0] ?? '?';
-  const playLabel = (result: PaResult | null, batterId: string | null | undefined) =>
-    result ? `${shortName(batterId)} ${result}` : 'pohyb běžců';
-
-  /** what Zpět takes back: the newest waiting play, else the newest saved play (of the game or the team) */
-  const undoLabel = $derived.by(() => {
-    const q = queue?.items.at(-1);
-    if (q) return playLabel(q.play.result, q.batter);
-    const p = [...plays].reverse().find((x) => x.kind === 'play' && (fullGame || x.teamId === teamId));
-    return p ? playLabel(p.result, p.batter) : null;
-  });
-  const redoNext = $derived(redoStack.at(-1) ?? null);
-
   /** The play is shown at once and sent in the background (works without signal too). */
-  function submit(play: Play, fromRedo = false) {
+  function submit(play: Play) {
     if (!session || !queue) return;
-    done = [...done.slice(-19), { play, batterId: play.result ? (batter?.id ?? null) : null, teamId: session.team_id, label: playLabel(play.result, batter?.id) }];
-    if (!fromRedo) redoStack = [];
     lastWasUndo = false;
     lastPlay = describe(play, batter?.name);
     lastSaved = true;
@@ -482,50 +462,20 @@
     return false;
   }
 
-  /** the play Zpět takes back was recorded on this device: keep it for Znovu */
-  function keepForRedo(label: string | null) {
-    const mine = done.at(-1);
-    if (mine && label && mine.label === label) {
-      done = done.slice(0, -1);
-      redoStack = [...redoStack, mine];
-    } else {
-      redoStack = [];
-    }
-  }
-
   const undo = () => {
     const s = session;
     if (!s) return;
-    const label = undoLabel;
     lastWasUndo = true;
     lastSaved = false;
     if (queue?.undoLast()) {
-      keepForRedo(label);
-      lastPlay = `Vráceno: ${label}.`;
+      lastPlay = 'Poslední akce vrácena.';
       return;
     }
     if (pending) {
       toasts.show('Akce se právě odesílá, zkus Zpět za chvilku.', 'error');
       return;
     }
-    run(() => liveUndo(s, fullGame), () => {
-      keepForRedo(label);
-      lastPlay = `Vráceno: ${label ?? 'poslední akce'}.`;
-    });
-  };
-
-  /** Znovu: the play taken back by Zpět, if the game is still where it was */
-  const redoPlay = () => {
-    const r = redoNext;
-    if (!r || !session) return;
-    const sameBatter = !r.play.result || r.batterId === (batter?.id ?? null);
-    if (session.team_id !== r.teamId || !sameBatter || validatePlay(r.play, bases, session.outs)) {
-      redoStack = [];
-      toasts.show('Znovu už nejde, stav zápasu se mezitím změnil.', 'error');
-      return;
-    }
-    redoStack = redoStack.slice(0, -1);
-    submit(r.play, true);
+    run(() => liveUndo(s, fullGame), () => (lastPlay = 'Poslední akce vrácena.'));
   };
 
   /**
@@ -690,24 +640,6 @@
       !!team && !!session && !session.finished && mode === 'score'
   );
 
-  /** while scoring, the page shows only the game: no site header, footer or menu */
-  $effect(() => {
-    if (!scoringVisible) return;
-    const root = document.documentElement;
-    root.classList.add('focus-mode');
-    return () => root.classList.remove('focus-mode');
-  });
-
-  /** in the log only the newest plays while scoring; the whole game on request */
-  let showAllPlays = $state(false);
-
-  /** teams in the scorebug: home first (as everywhere on the site), the batting one highlighted */
-  const bugTeams = $derived(
-    [home, away]
-      .filter((t): t is NonNullable<typeof t> => !!t)
-      .filter((t) => fullGame || t.id === teamId || (t.id === opponentId && opponentScored))
-  );
-
   const teamRoster = $derived(teamId ? league.teamPlayers(teamId, true) : []);
   const statusOf = (tid: number | undefined) => sessions.find((s) => s.team_id === tid);
 </script>
@@ -722,64 +654,17 @@
   <title>Živě: {home?.short_name ?? ''} – {away?.short_name ?? ''} – Pražský přebor mužů</title>
 </svelte:head>
 
-<div class="page live" class:scoring={scoringVisible}>
-  {#if !scoringVisible}
-    <a class="back" href="/zapasy/{id}"><Icon name="back" size={18} /> Detail zápasu</a>
-  {/if}
+<div class="page live">
+  <a class="back" href="/zapasy/{id}"><Icon name="back" size={18} /> Detail zápasu</a>
 
   {#if !game}
     <p class="empty">Zápas neexistuje.</p>
   {:else}
-    {#if scoringVisible && team && session}
-      <!-- ---------------------------------------------------------- focus bar + scorebug (always on top) -->
-      <div class="focusbar">
-        <div class="fb-row">
-          <a class="fb-back" href="/zapasy/{id}" aria-label="Zpět na detail zápasu"><Icon name="back" size={20} /></a>
-          <span class="fb-title">
-            <span class="dotlive" aria-hidden="true"></span>
-            {home?.short_name ?? home?.name} – {away?.short_name ?? away?.name}
-            {#if testGame}<span class="pill accent">Test</span>{/if}
-          </span>
-          <span class="save {saveState ?? 'idle'}" role="status" aria-live="polite">
-            {#if saveState === 'offline'}
-              <Icon name="wifi-off" size={14} /> Bez signálu · {pending}
-            {:else if saveState === 'error'}
-              <Icon name="warn" size={14} /> Neuloženo · {pending}
-            {:else if saveState === 'sending'}
-              <span class="spin"></span> Ukládám
-            {:else}
-              <Icon name="check" size={14} /> Uloženo
-            {/if}
-          </span>
-        </div>
-        <div class="bug" style:--team={team.color}>
-          {#each bugTeams as t (t.id)}
-            <span class="bt" class:bat={t.id === teamId}>
-              <TeamBadge team={t} size={22} />
-              <span class="bn">{t.short_name ?? t.code}</span>
-              <span class="bs num-c">{t.id === teamId ? ourRuns : runsOf(t.id)}</span>
-            </span>
-          {/each}
-          <span class="binn num-c" title="{session.inning}. směna{half ? `, ${half} polovina` : ''}">{session.inning}.{#if half}<span class="arr">{half === 'horní' ? '▲' : '▼'}</span>{/if}</span>
-          <svg class="minib" viewBox="0 0 40 30" aria-label="Mety: {bases.map((b, i) => (b ? `${i + 1}.` : null)).filter(Boolean).join(', ') || 'prázdné'}">
-            {#each [{ b: 1, x: 31, y: 16 }, { b: 2, x: 20, y: 6 }, { b: 3, x: 9, y: 16 }] as m (m.b)}
-              <rect class:on={!!bases[m.b - 1]} x={m.x - 5} y={m.y - 5} width="10" height="10" rx="1.5" transform="rotate(45 {m.x} {m.y})" />
-            {/each}
-          </svg>
-          <span class="bouts" aria-label="{session.outs} {session.outs === 1 ? 'out' : 'outy'}">
-            {#each [0, 1, 2] as i (i)}<span class="od" class:on={i < session.outs}></span>{/each}
-          </span>
-        </div>
-      </div>
-    {/if}
-
-{#if !scoringVisible}
-        <header class="title" class:compact={!!session && !session.finished && mode === 'score'}>
+    <header class="title" class:compact={!!session && !session.finished && mode === 'score'}>
       <span class="badge"><span class="pulse"></span> Živý zápis</span>
-      {#if testGame && scoringVisible}<span class="pill accent">Test</span>{/if}
+      {#if testGame && scoringVisible}<span class="pill warn">Test</span>{/if}
       <h1>{home?.short_name ?? home?.name} – {away?.short_name ?? away?.name}</h1>
     </header>
-    {/if}
     {#if testGame && !scoringVisible}
       <TestBanner onreset={afterTestReset} />
     {/if}
@@ -937,6 +822,7 @@
       {#if plays.length}
         <section class="feed">
           <div class="feed-head"><h2>Průběh zápasu</h2></div>
+          <p class="muted feed-hint">I po skončení jde u každé akce opravit výsledek nebo runs, případně akci smazat.</p>
           <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} />
         </section>
       {/if}
@@ -975,7 +861,7 @@
           </label>
           <div class="lbl">
             <span>Outy</span>
-            <div class="seg boxed" role="group" aria-label="Outy">
+            <div class="seg" role="group" aria-label="Outy">
               {#each [0, 1, 2] as n (n)}<button type="button" aria-pressed={fix.outs === n} onclick={() => (fix.outs = n)}>{n}</button>{/each}
             </div>
           </div>
@@ -1003,13 +889,55 @@
       </section>
     {:else}
       <!-- ---------------------------------------------------------- scoring -->
-      <section class="board" style:--team={team.color} in:fade={{ duration: 150 }}>
+      <section class="board card" style:--team={team.color} in:fade={{ duration: 150 }}>
+        <div class="sb">
+          <div class="inn">
+            <span class="k">Směna</span>
+            <span class="v">{session.inning}.{#if half}<span class="half" title="{half} polovina">{half === 'horní' ? '▲' : '▼'}</span>{/if}</span>
+          </div>
+          {#if fullGame}
+            {#each [away, home] as t (t?.id)}
+              {#if t}
+                <div class="runs" class:bat={t.id === teamId}>
+                  <span class="k"><TeamBadge team={t} size={18} /> {t.short_name ?? t.code}</span>
+                  <span class="v">{runsOf(t.id)}</span>
+                </div>
+              {/if}
+            {/each}
+          {:else}
+            <div class="runs">
+              <span class="k"><TeamBadge {team} size={18} /> {team.short_name ?? team.code}</span>
+              <span class="v">{ourRuns}</span>
+            </div>
+          {/if}
+          {#if !fullGame && opponentScored}
+            <div class="runs opp">
+              <span class="k"><TeamBadge team={league.team(opponentId)} size={18} /> {league.team(opponentId)?.short_name ?? ''}</span>
+              <span class="v">{runsOf(opponentId)}</span>
+            </div>
+          {/if}
+          <button type="button" class="undo" data-hint="undo" disabled={busy} onclick={undo} aria-label="Vrátit poslední akci">
+            <Icon name="undo" size={20} /><span>Zpět</span>
+          </button>
+        </div>
+
         <div data-hint="field">
-          <Diamond {bases} outs={session.outs} showOuts={false} onrunner={(b) => (sheet = { result: null, runnerFrom: b })} />
+          <Diamond {bases} outs={session.outs} onrunner={(b) => (sheet = { result: null, runnerFrom: b })} />
         </div>
         {#if lastPlay}
-          {#key lastPlay}
-            <p class="last" in:fade={{ duration: 200 }}>{lastPlay}</p>
+          {#key lastPlay + pending}
+            <p class="last" in:fade={{ duration: 200 }}>
+              {#if lastSaved && saveState === 'offline'}
+                <span class="sync off"><Icon name="wifi-off" size={15} /> Bez signálu · čeká {pending}</span>
+              {:else if lastSaved && saveState === 'sending'}
+                <span class="sync go"><span class="spin"></span> Ukládám</span>
+              {:else if lastSaved && saveState === 'saved'}
+                <span class="sync ok"><Icon name="check" size={15} /> Uloženo</span>
+              {:else}
+                <Icon name="check" size={16} />
+              {/if}
+              <span class="lt">{lastPlay}</span>
+            </p>
           {/key}
         {/if}
       </section>
@@ -1040,16 +968,6 @@
       {/key}
 
       <div class="dock" use:dock data-hint="pad">
-        <div class="undo-row">
-          <button type="button" class="undo" data-hint="undo" disabled={busy || !undoLabel} onclick={undo} aria-label="Zpět: vrátit {undoLabel ?? 'poslední akci'}">
-            <Icon name="undo" size={18} /><span class="ul">Zpět</span>{#if undoLabel}<span class="uw">{undoLabel}</span>{/if}
-          </button>
-          {#if redoNext}
-            <button type="button" class="undo redo" disabled={busy} onclick={redoPlay} aria-label="Znovu: {redoNext.label}">
-              <Icon name="redo" size={18} /><span class="ul">Znovu</span><span class="uw">{redoNext.label}</span>
-            </button>
-          {/if}
-        </div>
         <ResultPad disabled={busy} {allowed} onpick={tapResult} />
       </div>
 
@@ -1118,6 +1036,7 @@
           <h2>Průběh zápasu</h2>
           <a class="link-accent" href="/zapasy/{id}?historie">Historie změn</a>
         </div>
+        <p class="muted feed-hint">Tužkou u akce opravíš výsledek, runs ve směně, akci smažeš nebo k ní vrátíš celý zápis.</p>
         {#if pending}
           <ol class="waiting" aria-label="Akce čekající na odeslání">
             {#each [...(queue?.items ?? [])].reverse() as w (w.id)}
@@ -1129,12 +1048,7 @@
             {/each}
           </ol>
         {/if}
-        <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} limit={showAllPlays ? undefined : 3} />
-        {#if plays.filter((p) => p.kind === 'play').length > 3}
-          <button type="button" class="btn btn-quiet btn-sm more-plays" onclick={() => (showAllPlays = !showAllPlays)}>
-            {showAllPlays ? 'Jen poslední akce' : `Celý průběh (${plays.filter((p) => p.kind === 'play').length} akcí)`}
-          </button>
-        {/if}
+        <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} />
       </section>
     {/if}
   {/if}
@@ -1473,186 +1387,96 @@
     color: var(--ink);
   }
 
-  /* focus bar + scorebug: the game state stays on top while scoring */
-  .live.scoring {
-    padding-top: 0;
-  }
-  .focusbar {
-    position: sticky;
-    top: 0;
-    z-index: 25;
-    margin: 0 calc(var(--gutter) * -1) 10px;
-    padding: env(safe-area-inset-top) var(--gutter) 8px;
-    background: color-mix(in srgb, var(--bg) 97%, transparent);
-    border-bottom: 1px solid var(--line);
-  }
-  .fb-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 48px;
-  }
-  .fb-back {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    margin-left: -8px;
-    border-radius: 50%;
-    color: var(--muted);
-  }
-  .fb-back:hover {
-    color: var(--ink);
-    background: var(--surface-2);
-  }
-  .fb-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    margin-right: auto;
-    font-weight: 800;
-    font-size: 16px;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .dotlive {
-    width: 8px;
-    height: 8px;
-    flex: none;
-    border-radius: 50%;
-    background: var(--neg);
-    animation: blink 1.6s ease-in-out infinite;
-  }
-  @keyframes blink {
-    50% {
-      opacity: 0.35;
-    }
-  }
-  .save {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex: none;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 12.5px;
-    font-weight: 800;
-    background: var(--hit-soft);
-    color: var(--hit);
-  }
-  .save.sending {
-    background: var(--surface-2);
-    color: var(--muted);
-  }
-  .save.offline,
-  .save.error {
-    background: var(--warn-soft);
-    color: var(--warn);
-  }
-  .bug {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    border-radius: 16px;
+  /* scoreboard */
+  .board {
+    padding: 14px 14px 10px;
     background:
-      linear-gradient(90deg, color-mix(in srgb, var(--team) 14%, transparent), transparent 70%),
+      radial-gradient(100% 120% at 0% 0%, color-mix(in srgb, var(--team) 16%, transparent), transparent 60%),
       var(--surface);
-    border: 1px solid var(--line);
   }
-  .bt {
+  .sb {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .inn,
+  .runs {
+    display: grid;
+    gap: 2px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    min-width: 0;
+  }
+  .k {
     display: flex;
     align-items: center;
     gap: 6px;
-    min-width: 0;
-    padding: 2px 8px 2px 2px;
-    border-radius: 12px;
-    color: var(--muted);
-  }
-  .bt.bat {
-    color: var(--ink);
-    background: var(--surface-2);
-  }
-  .bn {
-    font-weight: 700;
-    font-size: 13px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .bs {
-    font-weight: 800;
-    font-size: 26px;
-    line-height: 1;
-    letter-spacing: -0.02em;
-  }
-  .binn {
-    margin-left: auto;
-    font-weight: 800;
-    font-size: 20px;
-    line-height: 1;
-  }
-  .arr {
     font-size: 12px;
-    margin-left: 2px;
+    font-weight: 700;
     color: var(--muted);
-    vertical-align: 3px;
+    white-space: nowrap;
   }
-  .minib {
-    width: 38px;
-    height: 28px;
-    flex: none;
+  .v {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
   }
-  .minib rect {
-    fill: var(--surface-3);
-    stroke: var(--line-strong);
-    stroke-width: 1.2;
+  .runs.opp .v {
+    color: var(--muted);
   }
-  .minib rect.on {
-    fill: var(--accent);
-    stroke: var(--accent);
+  .runs.bat {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
   }
-  .bouts {
+  .half {
+    font-size: 15px;
+    margin-left: 3px;
+    color: var(--accent-text);
+    vertical-align: 6px;
+  }
+  .undo {
+    margin-left: auto;
     display: grid;
-    gap: 3px;
-    flex: none;
+    justify-items: center;
+    align-content: center;
+    gap: 2px;
+    min-width: 64px;
+    padding: 6px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
   }
-  .od {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    border: 1.5px solid var(--faint);
+  .undo:hover {
+    border-color: var(--line-strong);
   }
-  .od.on {
-    background: var(--out);
-    border-color: var(--out);
-  }
-  @media (max-width: 380px) {
-    .bn {
-      display: none;
-    }
+  .undo[disabled] {
+    opacity: 0.5;
   }
 
-  /* field */
-  .board {
-    padding: 2px 0 0;
-  }
   .last {
-    margin: 4px 2px 0;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 2px 0;
     font-size: 13.5px;
     font-weight: 600;
     color: var(--muted);
   }
+  .last :global(svg) {
+    color: var(--pos);
+    flex: none;
+  }
   .board :global(.diamond) {
-    max-width: 240px;
+    max-width: 280px;
   }
   @media (max-width: 640px) {
     .board :global(.diamond) {
-      max-width: 200px;
+      max-width: 230px;
     }
     .back {
       margin-bottom: 8px;
@@ -1710,45 +1534,6 @@
   .dock {
     margin-top: 10px;
   }
-  .undo-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .undo {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    min-height: 40px;
-    padding: 6px 14px 6px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--line-strong);
-    background: var(--surface);
-    color: var(--ink);
-    font-size: 14px;
-    cursor: pointer;
-  }
-  .undo .ul {
-    font-weight: 800;
-  }
-  .undo .uw {
-    color: var(--muted);
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .undo:hover {
-    border-color: var(--faint);
-  }
-  .undo[disabled] {
-    opacity: 0.45;
-    cursor: default;
-  }
-  .undo.redo {
-    margin-left: auto;
-  }
   @media (max-width: 899px) {
     .dock {
       position: fixed;
@@ -1758,12 +1543,44 @@
       z-index: 31;
       margin: 0;
       padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
-      background: var(--bg);
+      background: color-mix(in srgb, var(--bg) 97%, transparent);
       border-top: 1px solid var(--line);
       box-shadow: 0 -8px 24px rgb(0 0 0 / 0.08);
     }
   }
 
+  /* save state of the last play */
+  .last .lt {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .sync.ok {
+    background: var(--pos-soft);
+    color: var(--pos);
+  }
+  .sync.go {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .sync.off {
+    background: var(--neg-soft);
+    color: var(--neg);
+  }
+  .sync :global(svg) {
+    color: currentColor !important;
+  }
   .spin {
     width: 11px;
     height: 11px;
@@ -1908,13 +1725,7 @@
     color: var(--accent-text);
   }
   .feed {
-    margin-top: 28px;
-  }
-  .feed :global(.half) {
-    margin-bottom: 8px;
-  }
-  .more-plays {
-    width: 100%;
+    margin-top: 32px;
   }
   .feed-head {
     display: flex;
@@ -1935,5 +1746,13 @@
       max-width: 860px;
     }
   }
-
+  @media (max-width: 400px) {
+    .v {
+      font-size: 26px;
+    }
+    .inn,
+    .runs {
+      padding: 6px 10px;
+    }
+  }
 </style>

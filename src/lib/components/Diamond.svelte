@@ -6,15 +6,12 @@
     bases,
     outs = 0,
     onrunner = undefined,
-    size = 'normal',
-    showOuts = true
+    size = 'normal'
   }: {
     bases: (string | null)[];
     outs?: number;
     onrunner?: (base: 1 | 2 | 3) => void;
     size?: 'normal' | 'small';
-    /** the live scoring shows the outs in its scorebug instead */
-    showOuts?: boolean;
   } = $props();
 
   // label position of each base (percent of the box)
@@ -55,12 +52,10 @@
     {/if}
   {/each}
 
-  {#if showOuts}
-    <span class="outs" aria-label="{outs} outů">
-      {#each [0, 1, 2] as i (i)}<span class="dot" class:on={i < outs}></span>{/each}
-      <span class="ol">outy</span>
-    </span>
-  {/if}
+  <span class="outs" aria-label="{outs} outů">
+    {#each [0, 1, 2] as i (i)}<span class="dot" class:on={i < outs}></span>{/each}
+    <span class="ol">outy</span>
+  </span>
 </div>
 
 <style>
@@ -148,8 +143,8 @@
     transition: background-color 200ms, border-color 200ms;
   }
   .dot.on {
-    background: var(--out);
-    border-color: var(--out);
+    background: var(--neg);
+    border-color: var(--neg);
   }
   .ol {
     font-size: 12px;

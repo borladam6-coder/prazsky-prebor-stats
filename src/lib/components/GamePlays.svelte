@@ -34,12 +34,12 @@
   const latestPlayId = $derived([...plays].reverse().find((p) => p.kind === 'play')?.id ?? null);
   const close = () => (editing = null);
 
-  async function run<T>(action: () => Promise<T>, message: (r: T) => string, undo?: { label: string; run: () => void }) {
+  async function run<T>(action: () => Promise<T>, message: (r: T) => string) {
     if (busy) return;
     busy = true;
     try {
       const r = await action();
-      toasts.show(message(r), 'ok', undo);
+      toasts.show(message(r));
       close();
     } catch (e) {
       if (!(e instanceof WriteCancelled)) {
@@ -51,19 +51,8 @@
     }
   }
 
-  /** a correction can be taken back right from its message */
   const saveResult = (pa: PlateAppearance, result: PaResult, rbi: number) =>
-    run(
-      () => updatePlateAppearance(pa, { result, rbi }),
-      () => `Opraveno: ${pa.result} → ${result}${rbi !== pa.rbi ? `, ${rbi} RBI` : ''}.`,
-      {
-        label: 'Vrátit',
-        run: () => {
-          const now = pas.find((p) => p.id === pa.id);
-          if (now) run(() => updatePlateAppearance(now, { result: pa.result, rbi: pa.rbi }), () => `Vráceno: ${pa.result}.`);
-        }
-      }
-    );
+    run(() => updatePlateAppearance(pa, { result, rbi }), () => `Opraveno: ${pa.result} → ${result}${rbi !== pa.rbi ? `, ${rbi} RBI` : ''}.`);
 
   const adjust = (playerId: string, delta: 1 | -1) => {
     const p = editing;
@@ -86,7 +75,8 @@
   };
 </script>
 
-<PlayLog {plays} {awayTeamId} sticky onedit={(p) => (editing = p)} />
+<p class="muted hint">Tužkou u akce opravíš výsledek (třeba hit, který byl ve skutečnosti error), RBI nebo runs. Všechno je v historii a dá se vrátit.</p>
+<PlayLog {plays} {awayTeamId} onedit={(p) => (editing = p)} />
 
 {#if editing}
   <EditPlaySheet
@@ -106,3 +96,10 @@
   />
 {/if}
 
+<style>
+  .hint {
+    font-size: 14px;
+    margin: 0 0 14px;
+    max-width: 70ch;
+  }
+</style>

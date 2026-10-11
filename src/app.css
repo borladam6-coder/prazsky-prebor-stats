@@ -1,11 +1,7 @@
 /* Global styles and design tokens.
    Dark-first sports dashboard: near-black canvas with a faint green glow,
-   soft rounded cards.
-   Colour has one meaning each:
-   - accent (yellow): what you can tap, the selected state, active navigation
-   - result semantics: hit green, on base without a hit blue, out muted red
-   - status: warning orange (with an icon), corrections neutral, success green
-   - team colours: identity only (badges, edge stripes, gradients), never state */
+   soft rounded cards, one warm yellow accent for actions and leaders,
+   green / red only for good / bad numbers. */
 
 @import '@fontsource-variable/bricolage-grotesque/standard';
 
@@ -34,15 +30,6 @@
   --pos-soft: rgb(24 138 85 / 0.12);
   --neg: #cf3f36;
   --neg-soft: rgb(207 63 54 / 0.1);
-
-  --hit: #188a55;
-  --hit-soft: rgb(24 138 85 / 0.12);
-  --onbase: #2563c9;
-  --onbase-soft: rgb(37 99 201 / 0.12);
-  --out: #b8473f;
-  --out-soft: rgb(184 71 63 / 0.1);
-  --warn: #b85407;
-  --warn-soft: rgb(234 115 22 / 0.14);
 
   --pill-active-bg: #121510;
   --pill-active-ink: #ffffff;
@@ -84,15 +71,6 @@
   --neg: #f26b61;
   --neg-soft: rgb(242 107 97 / 0.14);
 
-  --hit: #43d18f;
-  --hit-soft: rgb(67 209 143 / 0.14);
-  --onbase: #6aa8ff;
-  --onbase-soft: rgb(106 168 255 / 0.14);
-  --out: #e2766d;
-  --out-soft: rgb(226 118 109 / 0.13);
-  --warn: #ff9f4a;
-  --warn-soft: rgb(255 159 74 / 0.14);
-
   --pill-active-bg: #f1f2ee;
   --pill-active-ink: #0a0b0a;
 
@@ -126,15 +104,6 @@
     --neg: #f26b61;
     --neg-soft: rgb(242 107 97 / 0.14);
 
-    --hit: #43d18f;
-    --hit-soft: rgb(67 209 143 / 0.14);
-    --onbase: #6aa8ff;
-    --onbase-soft: rgb(106 168 255 / 0.14);
-    --out: #e2766d;
-    --out-soft: rgb(226 118 109 / 0.13);
-    --warn: #ff9f4a;
-    --warn-soft: rgb(255 159 74 / 0.14);
-
     --pill-active-bg: #f1f2ee;
     --pill-active-ink: #0a0b0a;
 
@@ -167,12 +136,6 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  font-variant-numeric: tabular-nums;
-}
-
-/* compact digits for scores and dense numbers (the font's width axis) */
-.num-c {
-  font-stretch: 78%;
   font-variant-numeric: tabular-nums;
 }
 
@@ -344,68 +307,36 @@ textarea {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* ------------------------------------------------------------ segmented control
-   Quiet on purpose: content, not the switch, should be the loudest thing on the page.
-   The selected item is marked by ink colour and a short accent underline. */
+/* ------------------------------------------------------------ segmented pills */
 .seg {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-  padding: 0;
-  border-bottom: 1px solid var(--line);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
 }
 .seg button {
-  position: relative;
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 8px 12px;
+  flex: 1 0 auto;
+  min-height: 36px;
+  padding: 6px 14px;
   border: 0;
-  border-radius: 10px 10px 0 0;
+  border-radius: 12px;
   background: transparent;
   color: var(--muted);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13.5px;
   cursor: pointer;
-  transition: color 160ms, background-color 160ms;
+  transition: background-color 160ms, color 160ms;
 }
 .seg button:hover {
   color: var(--ink);
-  background: var(--surface-2);
 }
 .seg button[aria-pressed='true'],
 .seg button[aria-selected='true'] {
-  color: var(--ink);
-}
-.seg button[aria-pressed='true']::after,
-.seg button[aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: -1px;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  background: var(--accent);
-}
-/* compact boxed variant for small inline choices (e.g. number of outs) */
-.seg.boxed {
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface-2);
-}
-.seg.boxed button {
-  flex: 1 0 auto;
-  border-radius: 10px;
-  min-height: 36px;
-}
-.seg.boxed button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-.seg.boxed button::after {
-  display: none;
+  background: var(--pill-active-bg);
+  color: var(--pill-active-ink);
 }
 
 .chip {
@@ -422,15 +353,15 @@ textarea {
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 160ms, color 160ms, border-color 160ms;
+  transition: background-color 160ms, color 160ms;
 }
 .chip:hover {
   color: var(--ink);
 }
 .chip[aria-pressed='true'] {
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
-  color: var(--ink);
+  background: var(--pill-active-bg);
+  border-color: var(--pill-active-bg);
+  color: var(--pill-active-ink);
 }
 
 /* ------------------------------------------------------------ status pills */
@@ -453,17 +384,8 @@ textarea {
   color: var(--neg);
 }
 .pill.warn {
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-/* the current batter and similar "here" markers */
-.pill.accent {
   background: var(--accent-soft);
   color: var(--accent-text);
-}
-.pill.onbase {
-  background: var(--onbase-soft);
-  color: var(--onbase);
 }
 .pill.neutral {
   background: var(--surface-3);
