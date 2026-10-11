@@ -137,7 +137,7 @@ begin
     order by s.game_id, s.team_id
     for update of s
   loop
-    -- one change group per session, so each can be taken back on its own
+    -- one change group per session: each shows in the history of its game
     perform set_config('app.change_group', gen_random_uuid()::text, true);
     perform set_config('app.source', 'import', true);
     perform set_config('app.action', 'live_autofinish', true);
