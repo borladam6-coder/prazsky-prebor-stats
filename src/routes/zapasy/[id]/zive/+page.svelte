@@ -414,11 +414,34 @@
     }
   }
 
+  /**
+   * Detailed scoring (per device): for a ball in play it asks where it went (optional)
+   * and for an out how it happened, also with nobody on base. Simple scoring saves a
+   * play with nobody on base right away.
+   */
+  let detailed = $state(false);
+  $effect(() => {
+    try {
+      detailed = localStorage.getItem('pps.scoring.detailed') === '1';
+    } catch {
+      /* private mode */
+    }
+  });
+  function toggleDetailed() {
+    detailed = !detailed;
+    try {
+      localStorage.setItem('pps.scoring.detailed', detailed ? '1' : '0');
+    } catch {
+      /* private mode */
+    }
+  }
+  const BALL_IN_PLAY: PaResult[] = ['1B', '2B', '3B', 'HR', 'OUT', 'ROE'];
+
   function tapResult(code: PaResult) {
     if (!session || busy) return;
     toasts.list = [];
     // nobody on base: nothing to ask, the usual outcome is saved right away (Zpět takes it back)
-    if (occupiedCount === 0) submit(defaultPlay(code, bases, session.outs));
+    if (occupiedCount === 0 && !(detailed && BALL_IN_PLAY.includes(code))) submit(defaultPlay(code, bases, session.outs));
     else sheet = { result: code, runnerFrom: null };
   }
 
@@ -948,6 +971,9 @@
                   <Icon name="flag" size={18} /><span><strong>Ukončit zápis</strong><small>Po posledním outu zápasu</small></span>
                 </button>
               {/if}
+              <button type="button" role="menuitemcheckbox" aria-checked={detailed} onclick={toggleDetailed}>
+                <Icon name="tune" size={18} /><span><strong>Podrobný zápis: {detailed ? 'zapnutý' : 'vypnutý'}</strong><small>{detailed ? 'U odpalů se ptá, kam letěl míč (nepovinné), u každého outu jak' : 'Zapni, chceš-li zapisovat, kam letěl míč a druh outu'}</small></span>
+              </button>
               <a role="menuitem" href="/zapasy/{id}/sledovat">
                 <Icon name="live" size={18} /><span><strong>Pohled diváka</strong><small>Jak zápas vidí ostatní</small></span>
               </a>
@@ -1030,6 +1056,7 @@
   <PlaySheet
     result={sheet.result}
     runnerFrom={sheet.runnerFrom}
+    {detailed}
     {bases}
     outs={session.outs}
     inning={session.inning}

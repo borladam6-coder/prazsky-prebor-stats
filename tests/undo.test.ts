@@ -164,3 +164,28 @@ test('fixing the last play after the game keeps the scoring finished', async () 
   assert.equal(after.runner_1, order[0]);
   await consistent();
 });
+
+test('play details are kept for the play-by-play (once, with the runners as they were)', async () => {
+  await play('1B', 1);
+  const s = await session();
+  const id = crypto.randomUUID();
+  const args = {
+    p_client_id: id, p_game_id: G, p_team_id: TEAM, p_expected_version: s.version,
+    p_result: 'OUT', p_batter_to: 0, p_runners: JSON.stringify([{ from: 1, to: 0 }]), p_rbi: null,
+    p_kind: 'dp', p_location: 'SS'
+  };
+  await t.rpc(c, 'live_play_detailed', args);
+  await t.rpc(c, 'live_play_detailed', args); // sent twice
+  const rows = await t.as('anon', `select * from live_play_details where game_id = $1 order by created_at`, [G]);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(
+    { kind: rows[0].kind, location: rows[0].location, batter: rows[0].batter_id, outs: rows[0].outs_before, runners: rows[0].runners },
+    { kind: 'dp', location: 'SS', batter: order[1], outs: 0, runners: [{ from: 1, to: 0, sb: false, player: order[0] }] }
+  );
+  assert.equal((await session()).outs, 2);
+  await expectError(t.rpc(c, 'live_play_detailed', { ...args, p_client_id: crypto.randomUUID(), p_kind: 'curve' }), /Neznámý druh/);
+  // taken back: the play disappears from the play-by-play with its details
+  await t.rpc(c, 'live_undo', { p_game_id: G, p_team_id: null });
+  assert.equal((await session()).outs, 0);
+  await consistent();
+});

@@ -11,6 +11,7 @@ import type {
   PlayerGameLine, PlayerTotals, TeamGameLine, TeamTotals
 } from './types.ts';
 import type { Play } from './live.ts';
+import type { PlayDetail } from './narrate.ts';
 import { buildPlays, type CurrentPas, type LogEntry, type LogGroup, type PlayItem } from './plays.ts';
 
 export class WriteCancelled extends Error {}
@@ -174,7 +175,20 @@ export async function gamePlayLog(gameId: number, pas: PlateAppearance[] = []): 
     groups.push(...((data ?? []) as LogGroup[]));
   }
   const current: CurrentPas = new Map(pas.map((p) => [p.id, { result: p.result, rbi: p.rbi, deleted: !!p.deleted_at }]));
-  return buildPlays(groups, ((entries ?? []) as LogEntry[]).filter((e) => live.has(e.group_id)), current);
+  // what happened in each play (since migration 010; older plays have none)
+  const details = new Map<string, PlayDetail>();
+  const { data: rows } = await db()
+    .from('live_play_details')
+    .select('group_id, inning, outs_before, batter_id, result, kind, location, batter_to, runners')
+    .eq('game_id', gameId)
+    .limit(2000);
+  for (const r of rows ?? []) {
+    details.set(r.group_id as string, {
+      inning: r.inning, outsBefore: r.outs_before, batterId: r.batter_id, result: r.result, kind: r.kind,
+      location: r.location, batterTo: r.batter_to, runners: (r.runners ?? []) as PlayDetail['runners']
+    });
+  }
+  return buildPlays(groups, ((entries ?? []) as LogEntry[]).filter((e) => live.has(e.group_id)), current, details);
 }
 
 export interface HistoryPage {
@@ -333,7 +347,7 @@ export async function livePlayOnce(clientId: string, s: Pick<LiveSession, 'game_
   const timer = setTimeout(() => ctrl.abort(), 15_000);
   try {
     const { data, error } = await db()
-      .rpc('live_play_once', {
+      .rpc('live_play_detailed', {
         p_client_id: clientId,
         ...live(s.game_id, s.team_id),
         p_expected_version: s.version,
@@ -341,6 +355,8 @@ export async function livePlayOnce(clientId: string, s: Pick<LiveSession, 'game_
         p_batter_to: play.batterTo,
         p_runners: play.runners,
         p_rbi: play.result ? play.rbi : null,
+        p_kind: play.kind ?? null,
+        p_location: play.location ?? null,
         p_actor: actor,
         p_device: identity.device
       })

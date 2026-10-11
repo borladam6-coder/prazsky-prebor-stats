@@ -15,6 +15,7 @@
     type Base, type Bases, type Dest, type FieldOut, type Play
   } from '../live.ts';
   import type { PaResult } from '../types.ts';
+  import { FIELD_POSITIONS, type FieldPos } from '../narrate.ts';
   import Icon from './Icon.svelte';
 
   let {
@@ -25,6 +26,7 @@
     nextSlot,
     lineup,
     runnerFrom = null,
+    detailed = false,
     busy = false,
     onconfirm,
     oncancel
@@ -37,6 +39,8 @@
     lineup: string[];
     /** runner-only play started by tapping this runner */
     runnerFrom?: Base | null;
+    /** detailed scoring: where the ball went (optional) and every out asks how */
+    detailed?: boolean;
     busy?: boolean;
     onconfirm: (play: Play) => void;
     oncancel: () => void;
@@ -67,14 +71,20 @@
   let rbiTouched = $state(false);
 
   /** an out in the field with runners on base: first say how it happened */
-  const fieldMode = untrack(() => result === 'OUT' && occupied(bases).length > 0);
+  const fieldMode = untrack(() => result === 'OUT' && (occupied(bases).length > 0 || detailed));
   let kind = $state<FieldOut | null>(null);
-  const kinds = untrack(() => fieldOutsFor(bases, outs));
+  const kinds = untrack(() => fieldOutsFor(bases, outs, detailed));
 
   function chooseKind(k: FieldOut) {
     kind = k;
-    play = defaultFieldOut(k, bases, outs);
+    play = { ...defaultFieldOut(k, bases, outs), location: play.location ?? null };
     rbiTouched = false;
+  }
+
+  /** where the ball went: only for balls in play, only in the detailed scoring, never required */
+  const askWhere = untrack(() => detailed && !!result && ['1B', '2B', '3B', 'HR', 'OUT', 'ROE'].includes(result));
+  function setWhere(pos: FieldPos) {
+    play = { ...play, location: play.location === pos ? null : pos };
   }
 
   /** after any change: push runners ahead, recompute the official result and the RBI */
@@ -150,6 +160,18 @@
     <h2 id="sheet-title">{title}</h2>
     <button type="button" class="x" aria-label="Zavřít" onclick={oncancel}><Icon name="close" size={20} /></button>
   </header>
+
+  {#if askWhere}
+    <div class="where">
+      <span class="wl">Kam <span class="muted">(nepovinné)</span></span>
+      <div class="wpos" role="group" aria-label="Kam letěl míč">
+        {#each FIELD_POSITIONS as f (f.pos)}
+          <button type="button" class="wp" aria-pressed={play.location === f.pos} title={f.label} onclick={() => setWhere(f.pos)}>{f.pos}</button>
+        {/each}
+        <button type="button" class="wp none" aria-pressed={!play.location} onclick={() => (play = { ...play, location: null })}>Neuvádět</button>
+      </div>
+    </div>
+  {/if}
 
   {#if fieldMode}
     {#if !kind}<p class="ask muted">Jak k outu došlo? Podle toho se předvyplní běžci a výsledek se zapíše sám.</p>{/if}
@@ -291,6 +313,39 @@
   .ask {
     margin: 6px 0 14px;
     font-size: 14px;
+  }
+  .where {
+    display: grid;
+    gap: 6px;
+    margin: 4px 0 14px;
+  }
+  .wl {
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .wpos {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .wp {
+    min-height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .wp[aria-pressed='true'] {
+    background: var(--pill-active-bg);
+    border-color: var(--pill-active-bg);
+    color: var(--pill-active-ink);
+  }
+  .wp.none {
+    font-weight: 700;
+    font-size: 12.5px;
   }
   .kinds {
     display: grid;

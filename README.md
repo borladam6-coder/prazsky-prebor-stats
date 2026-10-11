@@ -12,6 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 14: průběh zápasu jako oficiální play-by-play anglicky („Skokan Sváťa grounds into a double play to shortstop. Pevný Pavel forced out at 2nd. Skokan Sváťa out at 1st.“), souhrn každé poloviny směny (runs, hits, errors, LOB), přepínač Podrobný zápis (kam šel míček, line out / pop out, vždy jde „Neuvádět“).
 - Krok 13: softballové termíny všude anglicky (double play, fly out, stolen base, runs, G/W/L/PCT v tabulce …), i v hláškách databáze.
 - Krok 12: chytrý zápis outů (Out v poli → fly out / ground out / fielder’s choice / double play / sacrifice bunt; SF, SH, FC a RBI se odvodí samy), běžcům se nabízí jen možné mety a posun běžce posune i ty před ním, soupisky ze svazu jen na začátku sezóny, značka „Skóre nesedí“ u zápasů, kde zápis nesedí s výsledkem svazu.
 - Krok 11: smazání nebo vrácení akce vrátí přesně stav před ní (běžci, outy, pálkař), Zpět funguje i po opravách akce, starší akce jde smazat jen „od této akce“, oprava výsledku nabízí jen výsledky, které sedí na stav na metách.
@@ -36,6 +37,10 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Outy:** tlačítka 1B, 2B, 3B, HR, BB, HBP, K, OUT, ROE. OUT s prázdnými metami se uloží hned. S běžci na metách se web zeptá, jak k outu došlo: Fly out (běžci zůstávají; run po tag-upu při méně než 2 outech = SF s RBI), Ground out (out pálkaře, forced runners postoupí), Fielder’s choice (out běžce, pálkař na metě), Double play (bez RBI), Sacrifice bunt (= SH). Oficiální výsledek se ukáže („Zapíše se: SF – Sacrifice fly“) a mění se podle toho, co nastavíš u běžců.
 
+**Průběh zápasu (play-by-play):** každá nová akce se popíše větou jako v oficiálním zápisu: „singles to left field“, „reaches on an error by the shortstop“, „forced out at 2nd“, „doubled off 1st“, „out at 3rd after tagging up“, „steals 2nd“, „caught stealing 2nd“. Pod každou polovinou směny je souhrn runs, hits, errors (ROE) a LOB (běžci, kteří zůstali na metách po 3. outu). Akce zapsané před krokem 14 zůstávají v krátké podobě.
+
+**Podrobný zápis** (Další možnosti → Podrobný zápis, pamatuje si ho telefon): u 1B, 2B, 3B, HR, OUT a ROE se nabídne, kam šel míček (LF, CF, RF, 3B, SS, 2B, 1B, P, C nebo **Neuvádět**), a u outu i Line out a Pop out a druh outu i při prázdných metách. V jednoduchém zápisu se nic z toho neptá a věta je kratší („Daleký Dan singles.“).
+
 **Běžci:** nabízí se jen mety, kam se běžec mohl dostat (běžec z 1. mety při doublu: jen 3. meta, scored, nebo out). Když posuneš běžce nebo pálkaře, běžci před ním se posunou s ním.
 
 **Skóre nesedí:** když součet runs v našem zápisu týmu nesedí s výsledkem nahlášeným svazu, zápas má značku „Skóre nesedí“ a v detailu je vidět rozdíl. Je to jen upozornění, nic se nemění.
@@ -57,6 +62,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/010_play_details.sql  podrobnosti akcí pro play-by-play (druh, místo, běžci)
 supabase/migrations/009_english_terms.sql  softballové termíny v hláškách anglicky
 supabase/migrations/008_import_rosters_once.sql  soupisky ze svazu jen jako výchozí seznam
 supabase/migrations/007_exact_undo.sql  vrácení akce = přesně stav před ní
@@ -66,7 +72,7 @@ supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = v
 netlify/functions/import-league.mts plánovaný import ze softball.cz
 netlify/lib/softball-api.ts        stažení a očištění dat ze softball.cz
 src/routes/                        stránky: přehled, zápasy, týmy, hráči, historie
-src/lib/                           data, formátování, logika živého zápisu (live.ts), komponenty
+src/lib/                           data, formátování, logika živého zápisu (live.ts), věty play-by-play (narrate.ts), komponenty
 tests/                             automatické testy databáze a importu
 static/manifest.webmanifest, static/icons/  instalace jako aplikace (ikona na ploše)
 static/sw.js                       service worker: stránka jde otevřít i bez signálu, stránky vždy čerstvé ze sítě
@@ -79,7 +85,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql` a `009_english_terms.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql` a `010_play_details.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`
