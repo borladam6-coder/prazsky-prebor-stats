@@ -18,8 +18,8 @@
 
   const PAD: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT', 'ROE'];
   const LABELS: Partial<Record<PaResult, string>> = {
-    OUT: 'Out v poli: do vzduchu, po zemi, dvojitý, bunt',
-    ROE: 'Reached on error: na metě díky chybě obrany'
+    OUT: 'Out v poli: fly out, ground out, fielder’s choice, double play, sacrifice bunt',
+    ROE: 'Reached on error'
   };
   const buttons = PAD.map((code) => ({ code, label: LABELS[code] ?? resultDef(code)?.label ?? code, group: resultDef(code)?.group ?? 'out' }));
 

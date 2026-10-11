@@ -272,7 +272,7 @@
       <div class="livebar">
         <a class="btn btn-primary" href="/zapasy/{id}/zive"><Icon name="live" size={18} /> Zapisovat živě</a>
         <a class="btn btn-dark" href="/zapasy/{id}/sledovat">Sledovat</a>
-        <span class="muted">Zapisuješ pálkaře po pálkaři, doběhy se dopočítají samy. Ostatní můžou zápas sledovat živě.</span>
+        <span class="muted">Zapisuješ pálkaře po pálkaři, runs a RBI se dopočítají samy. Ostatní můžou zápas sledovat živě.</span>
       </div>
     {/if}
 
@@ -340,14 +340,14 @@
               <Icon name="live" size={22} />
               <div>
                 <strong>{entryTeam?.short_name ?? entryTeam?.name} má živý zápis</strong>
-                <p class="muted">Statistiky tohoto týmu vznikly ze živého zápisu. Opravují se v průběhu zápasu (tužkou u akce), aby seděly doběhy i pořadí.</p>
+                <p class="muted">Statistiky tohoto týmu vznikly ze živého zápisu. Opravují se v průběhu zápasu (tužkou u akce), aby seděly runs i pořadí.</p>
                 <a class="btn btn-primary btn-sm" href="/zapasy/{id}/zive?rezim=tym&tym={entryTeamId}"><Icon name="pencil" size={16} /> Opravit v živém zápisu</a>
               </div>
             </div>
           {:else}
           <p class="hint muted">
-            Klepni na hráče a zapisuj jeho příchody na pálku v pořadí, jak šly. Homerun automaticky přidá doběh i RBI.
-            Ukradené mety a doběhy uprav tlačítky + a −.
+            Klepni na hráče a zapisuj jeho příchody na pálku v pořadí, jak šly. Home run automaticky přidá run i RBI.
+            Stolen bases (SB) a runs (R) uprav tlačítky + a −.
           </p>
 
           <ul class="players" style:--team={entryTeam?.color}>
@@ -375,16 +375,16 @@
 
                     <div class="counters">
                       <div class="counter">
-                        <span class="clabel" title="Doběhy">R</span>
-                        <button type="button" aria-label="Ubrat doběh" disabled={busy || !x?.runs} onclick={() => bump(p, 'runs', -1)}><Icon name="minus" size={18} /></button>
+                        <span class="clabel" title="Runs">R</span>
+                        <button type="button" aria-label="Ubrat run" disabled={busy || !x?.runs} onclick={() => bump(p, 'runs', -1)}><Icon name="minus" size={18} /></button>
                         <span class="cval">{x?.runs ?? 0}</span>
-                        <button type="button" aria-label="Přidat doběh" disabled={busy} onclick={() => bump(p, 'runs', 1)}><Icon name="plus" size={18} /></button>
+                        <button type="button" aria-label="Přidat run" disabled={busy} onclick={() => bump(p, 'runs', 1)}><Icon name="plus" size={18} /></button>
                       </div>
                       <div class="counter">
-                        <span class="clabel" title="Ukradené mety">SB</span>
-                        <button type="button" aria-label="Ubrat ukradenou metu" disabled={busy || !x?.stolen_bases} onclick={() => bump(p, 'stolen_bases', -1)}><Icon name="minus" size={18} /></button>
+                        <span class="clabel" title="Stolen bases">SB</span>
+                        <button type="button" aria-label="Ubrat stolen base" disabled={busy || !x?.stolen_bases} onclick={() => bump(p, 'stolen_bases', -1)}><Icon name="minus" size={18} /></button>
                         <span class="cval">{x?.stolen_bases ?? 0}</span>
-                        <button type="button" aria-label="Přidat ukradenou metu" disabled={busy} onclick={() => bump(p, 'stolen_bases', 1)}><Icon name="plus" size={18} /></button>
+                        <button type="button" aria-label="Přidat stolen base" disabled={busy} onclick={() => bump(p, 'stolen_bases', 1)}><Icon name="plus" size={18} /></button>
                       </div>
                     </div>
 

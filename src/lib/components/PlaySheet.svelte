@@ -176,7 +176,7 @@
         <div class="choices">
           {#each batterOptions as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={play.batterTo === d} onclick={() => setBatter(d)}>
-              {d === 0 ? 'Out' : d === 4 ? 'Doběhl' : `${d}. meta`}
+              {d === 0 ? 'Out' : d === 4 ? 'Scored' : `${d}. meta`}
             </button>
           {/each}
         </div>
@@ -196,7 +196,7 @@
         {#if !result && r.to > r.from}
           <label class="sb">
             <input type="checkbox" checked={!!r.sb} onchange={() => toggleSb(r.from)} />
-            Ukradená meta (SB) – jinak postup na chybu, divoký nadhoz apod.
+            Stolen base (SB) – jinak postup na error, wild pitch, passed ball apod.
           </label>
         {/if}
       </fieldset>
@@ -204,7 +204,7 @@
 
     {#if result}
       <div class="rbi">
-        <span><strong>RBI</strong> <span class="muted">– doběhy zajištěné pálkařem</span></span>
+        <span><strong>RBI</strong> <span class="muted">– runs batted in</span></span>
         <span class="step">
           <button type="button" aria-label="Ubrat RBI" disabled={play.rbi <= 0} onclick={() => changeRbi(-1)}><Icon name="minus" size={18} /></button>
           <span class="val">{play.rbi}</span>
@@ -216,7 +216,7 @@
 
   {#if !fieldMode || kind}
   <p class="preview" aria-live="polite">
-    {#if runs}<span class="pill pos">+{runs} {plural(runs, ['bod', 'body', 'bodů'])}</span>{/if}
+    {#if runs}<span class="pill pos">+{runs} {plural(runs, ['run', 'runs', 'runs'])}</span>{/if}
     {#if outsOn(play)}<span class="pill neg">{outsWord(outsOn(play))}</span>{/if}
     {#if after.inningOver}
       <span>Konec {inning}. směny.</span>

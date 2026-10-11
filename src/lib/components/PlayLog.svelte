@@ -33,7 +33,7 @@
       <header>
         <span class="hn">{h.inning}. směna {h.teamId === awayTeamId ? '▲' : '▼'}</span>
         <span class="ht"><TeamBadge team={t} size={18} /> {t?.short_name ?? ''}</span>
-        {#if h.runs}<span class="pill {h.runs > 0 ? 'pos' : 'neg'}">{h.runs > 0 ? '+' : '−'}{Math.abs(h.runs)} {plural(Math.abs(h.runs), ['bod', 'body', 'bodů'])}</span>{/if}
+        {#if h.runs}<span class="pill {h.runs > 0 ? 'pos' : 'neg'}">{h.runs > 0 ? '+' : '−'}{Math.abs(h.runs)} {plural(Math.abs(h.runs), ['run', 'runs', 'runs'])}</span>{/if}
       </header>
       <ol>
         {#each h.plays as p (p.id)}
@@ -41,10 +41,10 @@
             {#if p.kind === 'adjust'}
               <span class="chip g-fix">OPR</span>
               <span class="desc">
-                <strong>Oprava doběhů</strong>
+                <strong>Oprava runs</strong>
                 <span class="extra">
-                  {#if p.scored.length}<span class="sc">+1 doběh: {p.scored.map(short).join(', ')}</span>{/if}
-                  {#if p.removed.length}<span class="out">−1 doběh: {p.removed.map(short).join(', ')}</span>{/if}
+                  {#if p.scored.length}<span class="sc">+1 run: {p.scored.map(short).join(', ')}</span>{/if}
+                  {#if p.removed.length}<span class="out">−1 run: {p.removed.map(short).join(', ')}</span>{/if}
                 </span>
               </span>
             {:else}
@@ -58,8 +58,8 @@
                 <span class="extra">
                   {#if p.edited}<span class="tag">upraveno</span>{/if}
                   {#if p.paDeleted}<span class="tag">zápis smazán</span>{/if}
-                  {#if p.stole.length}<span>ukradená meta: {p.stole.map(short).join(', ')}</span>{/if}
-                  {#if p.scored.length}<span class="sc">doběh: {p.scored.map(short).join(', ')}</span>{/if}
+                  {#if p.stole.length}<span>stolen base: {p.stole.map(short).join(', ')}</span>{/if}
+                  {#if p.scored.length}<span class="sc">run: {p.scored.map(short).join(', ')}</span>{/if}
                   {#if p.rbi}<span>{p.rbi} RBI</span>{/if}
                   {#if p.inningEnded}<span class="end">3. out, konec poloviny</span>{:else if p.outs}<span class="out">{p.outs === 1 ? `${p.outsAfter}. out` : `double play (${p.outsAfter}. out)`}</span>{/if}
                 </span>

@@ -12,7 +12,8 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
-- Krok 12: chytrý zápis outů (Out v poli → do vzduchu / po zemi / out běžce / dvojitý / bunt; SF, SH, FC a RBI se odvodí samy), běžcům se nabízí jen možné mety a posun běžce posune i ty před ním, soupisky ze svazu jen na začátku sezóny, značka „Skóre nesedí“ u zápasů, kde zápis nesedí s výsledkem svazu.
+- Krok 13: softballové termíny všude anglicky (double play, fly out, stolen base, runs, G/W/L/PCT v tabulce …), i v hláškách databáze.
+- Krok 12: chytrý zápis outů (Out v poli → fly out / ground out / fielder’s choice / double play / sacrifice bunt; SF, SH, FC a RBI se odvodí samy), běžcům se nabízí jen možné mety a posun běžce posune i ty před ním, soupisky ze svazu jen na začátku sezóny, značka „Skóre nesedí“ u zápasů, kde zápis nesedí s výsledkem svazu.
 - Krok 11: smazání nebo vrácení akce vrátí přesně stav před ní (běžci, outy, pálkař), Zpět funguje i po opravách akce, starší akce jde smazat jen „od této akce“, oprava výsledku nabízí jen výsledky, které sedí na stav na metách.
 - Krok 10: sestava 9 pálkařů (přepínač „Hrajeme v 10“ pro extra hráče), krátký kód správce (aspoň 4 znaky), testovací zápas s vymyšlenými týmy pro všechny.
 - Krok 9: menu bez Historie (je v patičce a v detailu zápasu), přehled na jeden pohled (živě, další zápas, poslední výsledky, top 3 pálkaři, tabulka), hledání hráčů a týmů (lupa nebo klávesa /), na telefonu tabulky jen s hlavními sloupci (přepínač Všechny statistiky), šedé obrysy při načítání, instalace jako aplikace, rychlejší start (data z minulé návštěvy hned, čerstvá chvíli poté).
@@ -33,11 +34,11 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Testovací zápas** (Zápasy → Vyzkoušet živý zápis, nebo odkaz v patičce): týmy Testovací Lvi a Testovací Orli po 12 vymyšlených hráčích, zápas je otevřený kdykoli. Je ve vlastní sezóně (id −1), takže se nepočítá do tabulky, žebříčků, statistik, hledání, „Právě se hraje“ ani do celkové historie změn, a import ze softball.cz na něj nesahá. Tlačítko Vynulovat (může kdokoli) smaže vše zapsané a zápis začne znovu.
 
-**Outy:** tlačítka 1B, 2B, 3B, HR, BB, HBP, K, OUT, ROE. OUT s prázdnými metami se uloží hned. S běžci na metách se web zeptá, jak k outu došlo: Do vzduchu (běžci zůstávají; doběh po chycení při méně než 2 outech = SF s RBI), Po zemi (out pálkaře, vynucení běžci postoupí), Out běžce (pálkař na metě = FC), Dvojitý out (bez RBI), Obětovaný bunt (= SH). Oficiální výsledek se ukáže („Zapíše se: SF – Sacrifice fly“) a mění se podle toho, co nastavíš u běžců.
+**Outy:** tlačítka 1B, 2B, 3B, HR, BB, HBP, K, OUT, ROE. OUT s prázdnými metami se uloží hned. S běžci na metách se web zeptá, jak k outu došlo: Fly out (běžci zůstávají; run po tag-upu při méně než 2 outech = SF s RBI), Ground out (out pálkaře, forced runners postoupí), Fielder’s choice (out běžce, pálkař na metě), Double play (bez RBI), Sacrifice bunt (= SH). Oficiální výsledek se ukáže („Zapíše se: SF – Sacrifice fly“) a mění se podle toho, co nastavíš u běžců.
 
-**Běžci:** nabízí se jen mety, kam se běžec mohl dostat (běžec z 1. mety při doublu: jen 3. meta, doběh, nebo out). Když posuneš běžce nebo pálkaře, běžci před ním se posunou s ním.
+**Běžci:** nabízí se jen mety, kam se běžec mohl dostat (běžec z 1. mety při doublu: jen 3. meta, scored, nebo out). Když posuneš běžce nebo pálkaře, běžci před ním se posunou s ním.
 
-**Skóre nesedí:** když součet doběhů v našem zápisu týmu nesedí s výsledkem nahlášeným svazu, zápas má značku „Skóre nesedí“ a v detailu je vidět rozdíl. Je to jen upozornění, nic se nemění.
+**Skóre nesedí:** když součet runs v našem zápisu týmu nesedí s výsledkem nahlášeným svazu, zápas má značku „Skóre nesedí“ a v detailu je vidět rozdíl. Je to jen upozornění, nic se nemění.
 
 **Bez signálu:** každá akce se nejdřív uloží v telefonu a hned se ukáže, pak se odešle. Bez signálu čeká (u poslední akce je vidět „Bez signálu · čeká N“) a odešle se sama, jakmile je připojení zpět, i po zavření a otevření stránky. Každá akce má vlastní identifikátor, takže se při opakovaném odeslání nezapíše dvakrát. Když databáze akci odmítne (např. mezitím zapsal někdo jiný), zápis se zastaví a nabídne Zkusit znovu nebo Zahodit čekající. Opravy, sestava a ukončení zápisu potřebují připojení.
 
@@ -56,6 +57,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/009_english_terms.sql  softballové termíny v hláškách anglicky
 supabase/migrations/008_import_rosters_once.sql  soupisky ze svazu jen jako výchozí seznam
 supabase/migrations/007_exact_undo.sql  vrácení akce = přesně stav před ní
 supabase/migrations/006_lineup_admin_testgame.sql  sestava 9/10, krátký kód správce, testovací zápas
@@ -77,7 +79,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql` a `008_import_rosters_once.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql` a `009_english_terms.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

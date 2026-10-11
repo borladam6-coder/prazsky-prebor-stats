@@ -18,26 +18,26 @@ export interface StatDef {
 }
 
 export const STATS: Record<StatKey, StatDef> = {
-  games: { key: 'games', label: 'Z', title: 'Zápasy', kind: 'count' },
-  pa: { key: 'pa', label: 'PA', title: 'Příchody na pálku', kind: 'count' },
-  ab: { key: 'ab', label: 'AB', title: 'Oficiální příchody na pálku (bez BB, HBP, SF, SH)', kind: 'count' },
-  h: { key: 'h', label: 'H', title: 'Úspěšné odpaly', kind: 'count' },
+  games: { key: 'games', label: 'G', title: 'Games', kind: 'count' },
+  pa: { key: 'pa', label: 'PA', title: 'Plate appearances', kind: 'count' },
+  ab: { key: 'ab', label: 'AB', title: 'At bats (bez BB, HBP, SF, SH)', kind: 'count' },
+  h: { key: 'h', label: 'H', title: 'Hits', kind: 'count' },
   singles: { key: 'singles', label: '1B', title: 'Singles', kind: 'count' },
   doubles: { key: 'doubles', label: '2B', title: 'Doubles', kind: 'count' },
   triples: { key: 'triples', label: '3B', title: 'Triples', kind: 'count' },
   hr: { key: 'hr', label: 'HR', title: 'Home runs', kind: 'count' },
-  tb: { key: 'tb', label: 'TB', title: 'Celkem met z odpalů', kind: 'count' },
-  rbi: { key: 'rbi', label: 'RBI', title: 'Doběhy zajištěné pálkařem', kind: 'count' },
-  r: { key: 'r', label: 'R', title: 'Doběhy', kind: 'count' },
+  tb: { key: 'tb', label: 'TB', title: 'Total bases', kind: 'count' },
+  rbi: { key: 'rbi', label: 'RBI', title: 'Runs batted in', kind: 'count' },
+  r: { key: 'r', label: 'R', title: 'Runs', kind: 'count' },
   bb: { key: 'bb', label: 'BB', title: 'Base on balls', kind: 'count' },
   k: { key: 'k', label: 'K', title: 'Strikeouts', kind: 'count', lowerIsBetter: true },
   hbp: { key: 'hbp', label: 'HBP', title: 'Hit by pitch', kind: 'count' },
   sf: { key: 'sf', label: 'SF', title: 'Sacrifice flies', kind: 'count' },
   sh: { key: 'sh', label: 'SH', title: 'Sacrifice bunts', kind: 'count' },
-  sb: { key: 'sb', label: 'SB', title: 'Ukradené mety', kind: 'count' },
-  avg: { key: 'avg', label: 'AVG', title: 'Pálkařský průměr = H / AB', kind: 'rate' },
-  obp: { key: 'obp', label: 'OBP', title: 'Procento na metě = (H + BB + HBP) / (AB + BB + HBP + SF)', kind: 'rate' },
-  slg: { key: 'slg', label: 'SLG', title: 'Síla odpalu = TB / AB', kind: 'rate' },
+  sb: { key: 'sb', label: 'SB', title: 'Stolen bases', kind: 'count' },
+  avg: { key: 'avg', label: 'AVG', title: 'Batting average = H / AB', kind: 'rate' },
+  obp: { key: 'obp', label: 'OBP', title: 'On-base percentage = (H + BB + HBP) / (AB + BB + HBP + SF)', kind: 'rate' },
+  slg: { key: 'slg', label: 'SLG', title: 'Slugging = TB / AB', kind: 'rate' },
   ops: { key: 'ops', label: 'OPS', title: 'OBP + SLG', kind: 'rate' }
 };
 

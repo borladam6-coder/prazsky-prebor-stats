@@ -157,7 +157,7 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     seen.add(r.from);
     if (!bases[r.from - 1]) return `Na ${r.from}. metě nikdo není.`;
     if (r.to !== 0 && r.to < r.from) return 'Běžec nemůže couvat.';
-    if (r.sb && (play.result || r.to === 0 || r.to === r.from)) return 'Ukradenou metu lze zapsat jen mimo odpal a jen s postupem běžce.';
+    if (r.sb && (play.result || r.to === 0 || r.to === r.from)) return 'Stolen base lze zapsat jen mimo odpal a jen s postupem běžce.';
     if (r.to >= 1 && r.to <= 3) {
       if (taken.has(r.to)) return 'Na jedné metě nemohou být dva běžci.';
       taken.add(r.to);
@@ -170,7 +170,7 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     if (play.batterTo !== null || play.rbi) return 'Bez výsledku na pálce nejde zapsat pálkaře ani RBI.';
     if (!play.runners.some((r) => r.to !== r.from)) return 'Žádný běžec se neposunul.';
   } else {
-    if ((play.result === 'SF' || play.result === 'SH') && outs >= 2) return 'Obětovaný odpal jde jen při méně než 2 outech.';
+    if ((play.result === 'SF' || play.result === 'SH') && outs >= 2) return 'Sacrifice jde jen při méně než 2 outech.';
     const [lo, hi] = BATTER_RANGE[play.result];
     if (play.batterTo === null || play.batterTo < lo || play.batterTo > hi) return 'Pálkař s tímto výsledkem nemůže skončit na zadané metě.';
     if (play.batterTo >= 1 && play.batterTo <= 3) {
@@ -178,9 +178,9 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     }
     pairs.push({ from: 0, to: play.batterTo });
     const runs = runsOn(play);
-    if (play.result === 'SF' && runs === 0) return 'Při obětovaném odpalu do pole musí doběhnout aspoň jeden běžec.';
+    if (play.result === 'SF' && runs === 0) return 'U sacrifice fly musí aspoň jeden běžec skórovat.';
     if ((play.result === 'HR' || play.result === 'SF') && play.rbi < 1) return 'HR i SF mají vždy aspoň 1 RBI.';
-    if (play.rbi < 0 || play.rbi > Math.min(4, runs)) return 'RBI nemůže být víc než doběhů v této akci.';
+    if (play.rbi < 0 || play.rbi > Math.min(4, runs)) return 'RBI nemůže být víc než runs v této akci.';
   }
 
   for (const a of pairs) {
@@ -227,7 +227,7 @@ export function batterChoices(result: PaResult): Dest[] {
 }
 
 export const destLabel = (d: Dest, from?: number): string =>
-  d === 0 ? 'Out' : d === 4 ? 'Doběhl' : d === from ? `Zůstal (${d}.)` : `${d}. meta`;
+  d === 0 ? 'Out' : d === 4 ? 'Scored' : d === from ? `Zůstal (${d}.)` : `${d}. meta`;
 
 // ---------------------------------------------------------------------------------
 // Only possible destinations
@@ -274,11 +274,11 @@ export function cascade<T extends Pick<Play, 'result' | 'batterTo' | 'runners'>>
 export type FieldOut = 'fly' | 'ground' | 'fc' | 'dp' | 'bunt';
 
 export const FIELD_OUTS: { kind: FieldOut; label: string; hint: string }[] = [
-  { kind: 'fly', label: 'Do vzduchu', hint: 'Chycený odpal (fly, line, pop). Běžci zůstávají, doběh po chycení = SF.' },
-  { kind: 'ground', label: 'Po zemi', hint: 'Out pálkaře na 1. metě, vynucení běžci postoupí.' },
-  { kind: 'fc', label: 'Out běžce', hint: 'Obrana vyautovala běžce, pálkař je na metě (fielder’s choice).' },
-  { kind: 'dp', label: 'Dvojitý out', hint: 'Out pálkaře i běžce v jedné akci. Bez RBI.' },
-  { kind: 'bunt', label: 'Obětovaný bunt', hint: 'Pálkař out, běžci postoupí o metu (SH).' }
+  { kind: 'fly', label: 'Fly out', hint: 'Chycený fly, line drive nebo pop up. Běžci zůstávají; run po tag-upu = sacrifice fly.' },
+  { kind: 'ground', label: 'Ground out', hint: 'Out pálkaře na 1. metě, forced runners postoupí.' },
+  { kind: 'fc', label: 'Fielder’s choice', hint: 'Out běžce (force out), pálkař je na metě.' },
+  { kind: 'dp', label: 'Double play', hint: 'Out pálkaře i běžce v jedné akci. Bez RBI.' },
+  { kind: 'bunt', label: 'Sacrifice bunt', hint: 'Pálkař out, běžci postoupí o metu.' }
 ];
 
 /** Field outs that make sense in this situation. */

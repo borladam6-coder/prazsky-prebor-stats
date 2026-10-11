@@ -61,8 +61,8 @@ function describePlay(entries: ChangeEntry[]): string {
     if (Number(e.new_data.runs ?? 0) > Number(o.runs ?? 0)) scored.push(playerName(e.new_data.player_id));
     if (Number(e.new_data.stolen_bases ?? 0) > Number(o.stolen_bases ?? 0)) stole.push(playerName(e.new_data.player_id));
   }
-  if (stole.length) parts.push(`ukradená meta: ${stole.join(', ')}`);
-  if (scored.length) parts.push(`doběh: ${scored.join(', ')}`);
+  if (stole.length) parts.push(`stolen base: ${stole.join(', ')}`);
+  if (scored.length) parts.push(`run: ${scored.join(', ')}`);
   const s = entries.find((e) => e.table_name === 'live_sessions');
   if (s?.old_data) {
     const o = s.old_data;
@@ -81,7 +81,7 @@ function describeEntry(e: ChangeEntry): string {
     return `Živý zápis ${teamLabel(n.team_id)}: ${describeSession(o, n)}`;
   }
   if (e.table_name === 'live_run_adjustments') {
-    return `Oprava doběhů ${Number(n.delta) > 0 ? '+1' : '−1'} ${playerName(n.player_id)} (${n.inning}. směna)${n.cancelled ? ', zrušeno' : ''}`;
+    return `Oprava runs ${Number(n.delta) > 0 ? '+1' : '−1'} ${playerName(n.player_id)} (${n.inning}. směna)${n.cancelled ? ', zrušeno' : ''}`;
   }
   if (e.table_name === 'game_score_overrides') {
     return n.home_score == null ? 'Ruční skóre zrušeno' : `Ruční skóre ${n.home_score}:${n.away_score}`;
@@ -147,7 +147,7 @@ export function describe(group: ChangeGroup, entries: ChangeEntry[]): Described 
       const adj = entries.find((e) => e.table_name === 'live_run_adjustments');
       const n = adj?.new_data ?? {};
       const sign = Number(n.delta) > 0 ? '+1' : '−1';
-      return { title: `Oprava doběhů: ${sign} ${playerName(n.player_id)} (${n.inning}. směna)`, context: gameLabel(gameId), gameId };
+      return { title: `Oprava runs: ${sign} ${playerName(n.player_id)} (${n.inning}. směna)`, context: gameLabel(gameId), gameId };
     }
     case 'live_delete_play': {
       const pa = entries.find((e) => e.table_name === 'plate_appearances');
