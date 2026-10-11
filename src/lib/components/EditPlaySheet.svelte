@@ -85,7 +85,7 @@
 <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="edit-title" transition:fly={{ y: 40, duration: 220 }}>
   <header>
     <div>
-      <h2 id="edit-title">{play.kind === 'adjust' ? 'Oprava doběhů' : 'Upravit akci'}</h2>
+      <h2 id="edit-title">{play.kind === 'adjust' ? 'Oprava runs' : 'Upravit akci'}</h2>
       <p class="muted sub">
         {play.inning}. směna {play.teamId === awayTeamId ? '▲' : '▼'} · {team?.short_name ?? team?.name}
         {#if play.kind === 'play'} · {play.result ? `${name(play.batter)}: ${play.result}` : 'pohyb běžců'}{/if}
@@ -96,8 +96,8 @@
 
   {#if play.kind === 'adjust'}
     <p>
-      {#if play.scored.length}Přidaný doběh: <strong>{name(play.scored[0])}</strong>{/if}
-      {#if play.removed.length}Odebraný doběh: <strong>{name(play.removed[0])}</strong>{/if}
+      {#if play.scored.length}Přidaný run: <strong>{name(play.scored[0])}</strong>{/if}
+      {#if play.removed.length}Odebraný run: <strong>{name(play.removed[0])}</strong>{/if}
     </p>
     <div class="actions">
       <button type="button" class="btn btn-quiet" onclick={onclose}>Zavřít</button>
@@ -131,26 +131,26 @@
     {/if}
 
     <section>
-      <h3>Doběhy v {play.inning}. směně</h3>
+      <h3>Runs v {play.inning}. směně</h3>
       {#if play.scored.length}
         <ul class="runs">
           {#each play.scored as pid, i (pid + i)}
             <li>
               <span>{name(pid)}</span>
-              <button type="button" class="btn btn-quiet btn-sm" disabled={busy} onclick={() => onadjust(pid, -1)}>−1 doběh</button>
+              <button type="button" class="btn btn-quiet btn-sm" disabled={busy} onclick={() => onadjust(pid, -1)}>−1 run</button>
             </li>
           {/each}
         </ul>
       {:else}
-        <p class="hint muted">V této akci nikdo nedoběhl.</p>
+        <p class="hint muted">V této akci nikdo neskóroval.</p>
       {/if}
       <div class="row">
-        <select class="select" bind:value={addPlayer} aria-label="Hráč, kterému přidat doběh">
-          <option value="">Přidat doběh hráči…</option>
+        <select class="select" bind:value={addPlayer} aria-label="Hráč, kterému přidat run">
+          <option value="">Přidat run hráči…</option>
           {#each roster as p (p.id)}<option value={p.id}>{p.jersey_number != null ? `#${p.jersey_number} ` : ''}{p.name}</option>{/each}
         </select>
         <button type="button" class="btn btn-sm" disabled={!addPlayer || busy} onclick={() => { onadjust(addPlayer, 1); addPlayer = ''; }}>
-          <Icon name="plus" size={16} /> Doběh
+          <Icon name="plus" size={16} /> Run
         </button>
       </div>
       <p class="hint muted">Oprava se zapíše do {play.inning}. směny, takže sedí i skóre po směnách.</p>

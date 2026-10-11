@@ -12,13 +12,13 @@
       target: 'pad',
       at: 'top',
       title: 'Výsledek pálkaře',
-      text: 'Klepni na výsledek. Když nikdo není na metě, uloží se hned. Jinak se zeptám, kam doběhli běžci. Podržením tlačítka uvidíš celý název.'
+      text: 'Klepni na výsledek. Když nikdo není na metě, uloží se hned. Jinak se zeptám, kam se dostali běžci. Podržením tlačítka uvidíš celý název.'
     },
     {
       target: 'field',
       at: 'bottom',
       title: 'Běžci na metách',
-      text: 'Klepnutím na běžce zapíšeš ukradenou metu nebo jiný postup mimo odpal.'
+      text: 'Klepnutím na běžce zapíšeš stolen base nebo jiný postup mimo odpal (wild pitch, passed ball, error).'
     },
     {
       target: 'undo',

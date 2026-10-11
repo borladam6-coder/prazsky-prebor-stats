@@ -25,12 +25,12 @@
       <tr>
         <th scope="col" class="pos">#</th>
         <th scope="col" class="team">Tým</th>
-        <th scope="col" class="games" title="Zápasy">Z</th>
-        <th scope="col" title="Výhry">V</th>
-        <th scope="col" title="Prohry">P</th>
-        <th scope="col" class="share" title="Podíl výher">Úspěšnost</th>
-        <th scope="col" class="wide" title="Skóre (body dané : obdržené)">Skóre</th>
-        <th scope="col" title="Rozdíl skóre">+/−</th>
+        <th scope="col" class="games" title="Games">G</th>
+        <th scope="col" title="Wins">W</th>
+        <th scope="col" title="Losses">L</th>
+        <th scope="col" class="share" title="Winning percentage">PCT</th>
+        <th scope="col" class="wide" title="Runs scored : runs allowed">RS:RA</th>
+        <th scope="col" title="Run differential">+/−</th>
         <th scope="col" class="pts" title="Body v tabulce">Body</th>
       </tr>
     </thead>

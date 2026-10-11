@@ -147,7 +147,7 @@
         <h1>{team.name}</h1>
         {#if standing}
           <p class="rec">
-            <span class="pos">{standing.position}.</span> místo, {standing.wins} výher, {standing.losses} proher{standing.draws ? `, ${standing.draws} remíz` : ''},
+            <span class="pos">{standing.position}.</span> místo, {standing.wins} W, {standing.losses} L{standing.draws ? `, ${standing.draws} T` : ''},
             skóre {standing.runs_for}:{standing.runs_against}
           </p>
         {/if}

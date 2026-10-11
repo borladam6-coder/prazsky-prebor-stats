@@ -42,7 +42,7 @@
       {#if outcome}
         <span class="pill {outcome === 'Výhra' ? 'pos' : outcome === 'Prohra' ? 'neg' : 'neutral'}">{outcome}</span>
       {:else if mismatch}
-        <span class="pill warn" title="Doběhy v zápisu nesedí s výsledkem nahlášeným svazu">Skóre nesedí</span>
+        <span class="pill warn" title="Runs v zápisu nesedí s výsledkem nahlášeným svazu">Skóre nesedí</span>
       {:else if recorded >= 2}
         <span class="pill pos">Zapsáno</span>
       {:else if recorded === 1}

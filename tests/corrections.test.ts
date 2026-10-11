@@ -94,7 +94,7 @@ test('a run correction in an inning shows in the box score and in the line score
   await t.rpc(c, 'live_adjust_runs', { p_game_id: game.id, p_team_id: game.away_team_id, p_inning: 1, p_player_id: away[1], p_delta: -1 });
   await expectError(
     t.rpc(c, 'live_adjust_runs', { p_game_id: game.id, p_team_id: game.away_team_id, p_inning: 1, p_player_id: away[1], p_delta: -1 }),
-    /žádný doběh/
+    /žádný run/
   );
   await expectError(
     t.rpc(c, 'live_adjust_runs', { p_game_id: game.id, p_team_id: game.away_team_id, p_inning: 1, p_player_id: home[0], p_delta: 1 }),

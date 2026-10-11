@@ -396,7 +396,7 @@
   function describe(play: Play, batterName: string | undefined) {
     const runs = runsOn(play);
     const head = play.result ? `${batterName ?? 'Pálkař'}: ${play.result}` : 'Pohyb běžců';
-    return runs ? `${head} · +${runs} ${plural(runs, ['bod', 'body', 'bodů'])}` : head;
+    return runs ? `${head} · +${runs} ${plural(runs, ['run', 'runs', 'runs'])}` : head;
   }
 
   /** The play is shown at once and sent in the background (works without signal too). */
@@ -538,7 +538,7 @@
     const p = editing;
     if (!p) return;
     run(() => liveAdjustRuns(id, p.teamId, p.inning, playerId, delta), () => {
-      lastPlay = `Doběh ${delta > 0 ? 'přidán' : 'odebrán'} (${p.inning}. směna).`;
+      lastPlay = `Run ${delta > 0 ? 'přidán' : 'odebrán'} (${p.inning}. směna).`;
       closeEdit();
     });
   };
@@ -774,7 +774,7 @@
       {#if plays.length}
         <section class="feed">
           <div class="feed-head"><h2>Průběh zápasu</h2></div>
-          <p class="muted feed-hint">I po skončení jde u každé akce opravit výsledek nebo doběhy, případně akci smazat.</p>
+          <p class="muted feed-hint">I po skončení jde u každé akce opravit výsledek nebo runs, případně akci smazat.</p>
           <PlayLog {plays} awayTeamId={game.away_team_id} onedit={editPlay} />
         </section>
       {/if}
@@ -985,7 +985,7 @@
           <h2>Průběh zápasu</h2>
           <a class="link-accent" href="/zapasy/{id}?historie">Historie změn</a>
         </div>
-        <p class="muted feed-hint">Tužkou u akce opravíš výsledek, doběhy ve směně, akci smažeš nebo k ní vrátíš celý zápis.</p>
+        <p class="muted feed-hint">Tužkou u akce opravíš výsledek, runs ve směně, akci smažeš nebo k ní vrátíš celý zápis.</p>
         {#if pending}
           <ol class="waiting" aria-label="Akce čekající na odeslání">
             {#each [...(queue?.items ?? [])].reverse() as w (w.id)}
