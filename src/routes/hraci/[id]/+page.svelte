@@ -2,7 +2,7 @@
   import { page } from '$app/state';
   import { untrack } from 'svelte';
   import { league } from '#lib/league.svelte.ts';
-  import { playerGameLog, playerSeason, battingTotals, errorMessage } from '#lib/api.ts';
+  import { playerGameLog, playerSeason, errorMessage } from '#lib/api.ts';
   import { statColumns } from '#lib/columns.ts';
   import { BOX_STATS, STATS, type StatKey } from '#lib/stats.ts';
   import { rate, num, day } from '#lib/format.ts';
@@ -20,8 +20,6 @@
   // Season line comes from the database view, which sums the same game lines.
   let season = $state<PlayerTotals | null>(null);
   let error = $state<string | null>(null);
-  /** every batter of the season, for the percentiles */
-  let league_ = $state<PlayerTotals[] | null>(null);
 
   $effect(() => {
     const pid = id;
@@ -34,38 +32,7 @@
       } catch (e) {
         error = errorMessage(e);
       }
-      if (!league_ && league.season) battingTotals(league.season.id).then((t) => (league_ = t)).catch(() => {});
     });
-  });
-
-  // ------------------------------------------------------------ percentiles (Baseball Savant style)
-  // Only qualified batters are ranked, colour means "how good", and the pool size is shown.
-  const MIN_PA = 10;
-  const PCT_STATS: { key: string; label: string; title: string; value: (t: PlayerTotals) => number | null; lower?: boolean; rate?: boolean }[] = [
-    { key: 'avg', label: 'AVG', title: 'Batting average', value: (t) => t.avg, rate: true },
-    { key: 'obp', label: 'OBP', title: 'On-base percentage', value: (t) => t.obp, rate: true },
-    { key: 'slg', label: 'SLG', title: 'Slugging percentage', value: (t) => t.slg, rate: true },
-    { key: 'ops', label: 'OPS', title: 'On-base plus slugging', value: (t) => t.ops, rate: true },
-    { key: 'hr', label: 'HR', title: 'Home runs', value: (t) => t.hr },
-    { key: 'rbi', label: 'RBI', title: 'Runs batted in', value: (t) => t.rbi },
-    { key: 'sb', label: 'SB', title: 'Stolen bases', value: (t) => t.sb },
-    { key: 'k', label: 'K %', title: 'Strikeouts na PA (méně je lépe)', value: (t) => (t.pa ? t.k / t.pa : null), lower: true }
-  ];
-  const pool = $derived((league_ ?? []).filter((t) => t.pa >= MIN_PA));
-  const qualified = $derived(!!season && season.pa >= MIN_PA);
-  const percentiles = $derived.by(() => {
-    if (!season || !qualified || pool.length < 3) return [];
-    return PCT_STATS.map((st) => {
-      const mine = st.value(season!);
-      const values = pool.map(st.value).filter((v): v is number => v !== null && v !== undefined).map(Number);
-      if (mine === null || mine === undefined || !values.length) return null;
-      const m = Number(mine);
-      const below = values.filter((v) => (st.lower ? v > m : v < m)).length;
-      const equal = values.filter((v) => v === m).length;
-      const pct = Math.round(((below + Math.max(0, equal - 1) / 2) / Math.max(1, values.length - 1)) * 100);
-      const shown = st.key === 'k' ? `${Math.round(m * 100)} %` : st.rate ? rate(m) : num(m);
-      return { ...st, pct: Math.max(0, Math.min(100, pct)), shown };
-    }).filter((x) => x !== null);
   });
 
   const tiles: StatKey[] = ['avg', 'obp', 'slg', 'ops'];
@@ -124,30 +91,6 @@
           </div>
         {/each}
       </dl>
-
-      {#if league_}
-        <section class="section pcts" aria-labelledby="pct-title">
-          <div class="section-head">
-            <h2 id="pct-title">V porovnání s ligou</h2>
-            <span class="muted pool">z {pool.length} hráčů s min. {MIN_PA} PA</span>
-          </div>
-          {#if !qualified}
-            <p class="muted">Percentily se počítají od {MIN_PA} PA, {player.name.split(' ')[0]} má zatím {season.pa}.</p>
-          {:else if percentiles.length === 0}
-            <p class="muted">Zatím málo hráčů na porovnání.</p>
-          {:else}
-            <ul class="pctlist">
-              {#each percentiles as p (p.key)}
-                <li title="{p.title}: lepší než {p.pct} % hráčů">
-                  <span class="pl-l">{p.label}</span>
-                  <span class="pl-bar"><span class="pl-fill" style:--p={p.pct}></span><span class="pl-dot num-c" style:--p={p.pct}>{p.pct}</span></span>
-                  <span class="pl-v num-c">{p.shown}</span>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </section>
-      {/if}
 
       <section class="section">
         <div class="section-head"><h2>Zápas po zápase</h2></div>
@@ -251,7 +194,9 @@
     letter-spacing: -0.04em;
     line-height: 1;
   }
-
+  .tile:last-child .tv {
+    color: var(--accent-text);
+  }
   .tl {
     order: -1;
     font-size: 13.5px;
@@ -282,68 +227,6 @@
     font-size: 22px;
     letter-spacing: -0.02em;
     line-height: 1.2;
-  }
-  /* percentile bars: one hue, stronger = better */
-  .pool {
-    font-size: 13px;
-  }
-  .pctlist {
-    list-style: none;
-    margin: 0;
-    padding: 6px 16px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-l);
-    background: var(--surface);
-  }
-  .pctlist li {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 56px;
-    align-items: center;
-    gap: 12px;
-    padding: 9px 0;
-  }
-  .pctlist li + li {
-    border-top: 1px solid var(--line);
-  }
-  .pl-l {
-    font-weight: 800;
-    font-size: 13.5px;
-  }
-  .pl-bar {
-    position: relative;
-    height: 8px;
-    border-radius: 4px;
-    background: var(--surface-3);
-    margin-right: 14px;
-  }
-  .pl-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: calc(var(--p) * 1%);
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--accent) calc(35% + var(--p) * 0.65%), var(--surface-3));
-  }
-  .pl-dot {
-    position: absolute;
-    top: 50%;
-    left: calc(var(--p) * 1%);
-    transform: translate(-50%, -50%);
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) calc(35% + var(--p) * 0.65%), var(--surface-3));
-    color: var(--accent-ink);
-    font-size: 12.5px;
-    font-weight: 800;
-    box-shadow: 0 0 0 3px var(--surface);
-  }
-  .pl-v {
-    text-align: right;
-    font-weight: 800;
   }
   .game {
     display: flex;

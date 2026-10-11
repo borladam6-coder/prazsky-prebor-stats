@@ -8,8 +8,7 @@
     gameLines, gameEntries, addPlateAppearance, updatePlateAppearance, deletePlateAppearance,
     bumpStat, addPlayer, errorMessage, WriteCancelled, liveOfGame, LIVE_STALE_MS, gamePlayLog
   } from '#lib/api.ts';
-  import { lineScore, type PlayItem } from '#lib/plays.ts';
-  import { isoDay } from '#lib/format.ts';
+  import type { PlayItem } from '#lib/plays.ts';
   import GamePlays from '#lib/components/GamePlays.svelte';
   import { statColumns } from '#lib/columns.ts';
   import { BOX_STATS, RESULTS, resultDef } from '#lib/stats.ts';
@@ -65,28 +64,6 @@
   /** play-by-play of the live scoring (empty when the game was not scored live) */
   let plays = $state<PlayItem[]>([]);
   const hasPlays = $derived(plays.length > 0);
-
-  /** line score from the play-by-play: runs per inning, R (box score), H, E (opponent's ROE) */
-  const line = $derived.by(() => {
-    if (!hasPlays || !game) return null;
-    const per = lineScore(plays);
-    const innings = Math.max(7, ...[...per.values()].map((r) => r.length));
-    const row = (tid: number, oppId: number) => {
-      const runs = per.get(tid) ?? [];
-      const box = lines.filter((l) => l.team_id === tid);
-      return {
-        team: league.team(tid),
-        cells: Array.from({ length: innings }, (_, i) => (i < runs.length ? runs[i] : null)),
-        r: runsByTeam.get(tid) ?? runs.reduce((a, x) => a + x, 0),
-        h: box.reduce((a, l) => a + Number(l.h), 0),
-        e: pas.filter((p) => p.result === 'ROE' && league.player(p.player_id)?.team_id === oppId).length,
-        scored: per.has(tid)
-      };
-    };
-    return { innings, rows: [row(game.away_team_id, game.home_team_id), row(game.home_team_id, game.away_team_id)] };
-  });
-  /** writing is the main action only on the game day; afterwards it is one of the tools */
-  const gameToday = $derived(!!game?.starts_at && isoDay(game.starts_at) === isoDay(new Date().toISOString()));
   let entryTeamId = $state<number | null>(null);
   let openPlayer = $state<string | null>(null);
   let busy = $state(false);
@@ -297,28 +274,12 @@
         {#if game.score_override}<span class="pill warn override">skóre upravil správce</span><br />{/if}
         {#if mismatch.length}
           <span class="mismatch" title="Jen upozornění, nic se nemění">
-            <Icon name="warn" size={14} /> Nesedí s výsledkem svazu:
+            Nesedí s výsledkem svazu:
             {#each mismatch as m, i (m.teamId)}{i ? ', ' : ' '}{league.team(m.teamId)?.short_name ?? league.team(m.teamId)?.name} {m.ours} v zápisu, oficiálně {m.official}{/each}
           </span><br />
         {/if}
         {longDate(game.starts_at)}{game.starts_at ? `, ${time(game.starts_at)}` : ''}{game.venue ? `, ${game.venue}` : ''}
       </p>
-      {#if line}
-        <div class="linescore" role="table" aria-label="Skóre po směnách" style:--n={line.innings}>
-          <div class="ls-row ls-head" role="row">
-            <span class="ls-team" role="columnheader"></span>
-            {#each Array.from({ length: line.innings }, (_, i) => i + 1) as n (n)}<span role="columnheader">{n}</span>{/each}
-            <span class="ls-tot" role="columnheader">R</span><span role="columnheader">H</span><span role="columnheader" title="Errors: reached on error soupeře">E</span>
-          </div>
-          {#each line.rows as r (r.team?.id)}
-            <div class="ls-row" role="row">
-              <span class="ls-team" role="rowheader"><TeamBadge team={r.team} size={18} /> {r.team?.short_name ?? r.team?.code}</span>
-              {#each r.cells as c, i (i)}<span role="cell" class:dim={c === 0}>{c ?? (r.scored ? '' : '–')}</span>{/each}
-              <span class="ls-tot" role="cell">{r.scored ? r.r : '–'}</span><span role="cell">{r.scored ? r.h : '–'}</span><span role="cell">{r.scored ? r.e : '–'}</span>
-            </div>
-          {/each}
-        </div>
-      {/if}
     </section>
 
     {#if activeLive.length}
@@ -328,12 +289,9 @@
       </div>
     {:else if liveOpen}
       <div class="livebar">
-        {#if gameToday && !hasPlays}
-          <a class="btn btn-primary" href="/zapasy/{id}/zive"><Icon name="live" size={18} /> Zapisovat živě</a>
-          <a class="btn btn-dark" href="/zapasy/{id}/sledovat">Sledovat</a>
-        {:else}
-          <a class="btn btn-dark btn-sm" href="/zapasy/{id}/zive"><Icon name="live" size={16} /> Živý zápis</a>
-        {/if}
+        <a class="btn btn-primary" href="/zapasy/{id}/zive"><Icon name="live" size={18} /> Zapisovat živě</a>
+        <a class="btn btn-dark" href="/zapasy/{id}/sledovat">Sledovat</a>
+        <span class="muted">Zapisuješ pálkaře po pálkaři, runs a RBI se dopočítají samy. Ostatní můžou zápas sledovat živě.</span>
       </div>
     {/if}
 
@@ -342,9 +300,8 @@
       {#if hasPlays}
         <button type="button" role="tab" aria-selected={tab === 'plays'} onclick={() => (tab = 'plays')}>Průběh</button>
       {/if}
-      <span class="tab-gap" aria-hidden="true"></span>
-      <button type="button" role="tab" class="edit-tab" aria-selected={tab === 'entry'} onclick={() => (tab = 'entry')}><Icon name="pencil" size={15} /> Zapsat</button>
-      <button type="button" role="tab" class="edit-tab" aria-selected={tab === 'history'} onclick={() => (tab = 'history')}><Icon name="history" size={15} /> Historie</button>
+      <button type="button" role="tab" aria-selected={tab === 'entry'} onclick={() => (tab = 'entry')}>{hasPlays ? 'Zapsat' : 'Zapsat statistiky'}</button>
+      <button type="button" role="tab" aria-selected={tab === 'history'} onclick={() => (tab = 'history')}>Historie</button>
     </div>
 
     {#if loadError}
@@ -537,14 +494,12 @@
     color: var(--ink);
   }
   .mismatch {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: inline-block;
     margin-bottom: 6px;
     padding: 4px 10px;
     border-radius: 999px;
-    background: var(--warn-soft);
-    color: var(--warn);
+    background: var(--accent-soft);
+    color: var(--accent-text);
     font-size: 13px;
     font-weight: 700;
   }
@@ -655,66 +610,10 @@
     font-size: 14px;
   }
 
-  /* ---------- line score */
-  .linescore {
-    grid-column: 1 / -1;
-    margin-top: 6px;
-    overflow-x: auto;
-    font-size: 13.5px;
-  }
-  .ls-row {
-    display: grid;
-    grid-template-columns: minmax(64px, 1fr) repeat(var(--n, 7), minmax(18px, 26px)) repeat(3, minmax(22px, 30px));
-    align-items: center;
-    gap: 2px;
-    padding: 4px 0;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-  .ls-row + .ls-row {
-    border-top: 1px solid var(--line);
-  }
-  .ls-head {
-    color: var(--faint);
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .ls-team {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    text-align: left;
-    font-weight: 700;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .ls-row .dim {
-    color: var(--faint);
-  }
-  .ls-tot {
-    font-weight: 800;
-    border-left: 1px solid var(--line);
-  }
-
-  /* ---------- tabs: stick under the site header */
+  /* ---------- tabs */
   .tabs {
-    position: sticky;
-    top: var(--header-h, 0px);
-    z-index: 5;
-    margin: 18px calc(var(--gutter) * -1) 20px;
-    padding: 0 var(--gutter);
-    background: var(--bg);
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .tab-gap {
-    flex: 1 1 8px;
-  }
-  .edit-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+    margin: 18px 0 20px;
+    max-width: 520px;
   }
 
   /* ---------- box score */

@@ -16,11 +16,7 @@
     onpick: (code: PaResult) => void;
   } = $props();
 
-  // rows: hits · reached without a hit · outs (the most common results get the biggest buttons)
-  const PAD: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'ROE', 'K', 'OUT'];
-  /** grid columns (of 12) each button takes, and which edge its name tip sticks to */
-  const SPAN: Record<string, number> = { '1B': 3, '2B': 3, '3B': 3, HR: 3, BB: 4, HBP: 4, ROE: 4, K: 4, OUT: 8 };
-  const EDGE: Record<string, 'left' | 'right' | ''> = { '1B': 'left', BB: 'left', K: 'left', HR: 'right', ROE: 'right', OUT: 'right' };
+  const PAD: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT', 'ROE'];
   const LABELS: Partial<Record<PaResult, string>> = {
     OUT: 'Out v poli: fly out, ground out, fielder’s choice, double play, sacrifice bunt',
     ROE: 'Reached on error'
@@ -62,9 +58,7 @@
   {#each buttons as r (r.code)}
     <button
       type="button"
-      class="res g-{r.group} edge-{EDGE[r.code] ?? ''}"
-      class:big={r.code === 'OUT' || r.code === 'K'}
-      style:grid-column="span {SPAN[r.code]}"
+      class="res g-{r.group}"
       title={r.label}
       aria-label="{r.code}, {r.label}"
       disabled={disabled || !allowed(r.code)}
@@ -86,23 +80,22 @@
 <style>
   .pad {
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 7px;
   }
   .res {
     position: relative;
     display: grid;
     place-items: center;
-    min-height: 50px;
+    min-height: 54px;
     padding: 6px 4px;
-    border-radius: 14px;
+    border-radius: 15px;
     border: 1px solid var(--line);
     background: var(--surface);
     color: var(--ink);
     font-weight: 800;
     font-size: 21px;
-    font-stretch: 88%;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
@@ -110,48 +103,31 @@
     touch-action: manipulation;
     transition: transform 90ms, background-color 140ms, border-color 140ms, opacity 140ms;
   }
-  /* hits: green tone, reached without a hit: blue tone, outs: neutral with a thin muted red line */
-  .res.g-hit {
-    background: color-mix(in srgb, var(--hit) 13%, var(--surface));
-    border-color: color-mix(in srgb, var(--hit) 22%, transparent);
-    color: var(--hit);
-  }
-  .res.g-onbase {
-    background: color-mix(in srgb, var(--onbase) 13%, var(--surface));
-    border-color: color-mix(in srgb, var(--onbase) 22%, transparent);
-    color: var(--onbase);
-  }
-  .res.g-out::before {
+  .res::before {
     content: '';
     position: absolute;
-    left: 14px;
-    right: 14px;
+    left: 10px;
+    right: 10px;
     bottom: 7px;
-    height: 2px;
-    border-radius: 2px;
-    background: var(--out);
-    opacity: 0.45;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--faint);
+    opacity: 0.55;
   }
-  .res.big {
-    min-height: 58px;
-    font-size: 23px;
+  .res.g-hit::before {
+    background: var(--pos);
+    opacity: 1;
   }
-  /* a gap between the groups: hits, on base, outs */
-  .res:nth-child(5),
-  .res:nth-child(8) {
-    margin-top: 4px;
-  }
-  .res:nth-child(6),
-  .res:nth-child(7),
-  .res:nth-child(9) {
-    margin-top: 4px;
+  .res.g-onbase::before {
+    background: var(--accent);
+    opacity: 1;
   }
   .res:hover {
-    filter: brightness(1.06);
     border-color: var(--line-strong);
+    background: var(--surface-3);
   }
   .res:active {
-    transform: scale(0.96);
+    transform: scale(0.95);
   }
   .res[disabled] {
     opacity: 0.28;
@@ -170,7 +146,6 @@
     color: var(--pill-active-ink);
     font-size: 13px;
     font-weight: 700;
-    font-stretch: 100%;
     letter-spacing: 0;
     width: max-content;
     max-width: 210px;
@@ -178,23 +153,20 @@
     pointer-events: none;
     box-shadow: var(--shadow);
   }
-  /* edge buttons: keep the name on screen */
-  .edge-left .tip {
+  /* edge columns: keep the name on screen */
+  .res:nth-child(3n + 1) .tip {
     left: 0;
     transform: none;
   }
-  .edge-right .tip {
+  .res:nth-child(3n) .tip {
     left: auto;
     right: 0;
     transform: none;
   }
   @media (min-width: 640px) {
     .res {
-      min-height: 56px;
-      font-size: 22px;
-    }
-    .res.big {
       min-height: 60px;
+      font-size: 22px;
     }
   }
 </style>

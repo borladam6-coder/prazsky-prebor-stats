@@ -3,8 +3,7 @@
   type Name =
     | 'board' | 'calendar' | 'shield' | 'player' | 'history' | 'sun' | 'moon' | 'auto'
     | 'chevron' | 'back' | 'plus' | 'minus' | 'undo' | 'pencil' | 'close' | 'check' | 'search' | 'trash'
-    | 'live' | 'up' | 'down' | 'swap' | 'flag' | 'tune' | 'more' | 'help' | 'wifi-off' | 'grip' | 'copy'
-    | 'redo' | 'warn';
+    | 'live' | 'up' | 'down' | 'swap' | 'flag' | 'tune' | 'more' | 'help' | 'wifi-off' | 'grip' | 'copy';
 
   let { name, size = 20 }: { name: Name; size?: number } = $props();
 </script>
@@ -36,10 +35,6 @@
     <path d="M5 12h14" />
   {:else if name === 'undo'}
     <path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-  {:else if name === 'redo'}
-    <path d="M15 14l5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
-  {:else if name === 'warn'}
-    <path d="M12 4l9 16H3L12 4z" /><path d="M12 10v4M12 17.2v.3" />
   {:else if name === 'pencil'}
     <path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16l-1 4z" />
   {:else if name === 'close'}

@@ -201,7 +201,7 @@
             <span class="jn">{p?.jersey_number ?? '–'}</span>
             <span class="pn">
               {p?.name ?? '?'}
-              {#if up === i}<span class="pill accent">na pálce</span>{/if}
+              {#if up === i}<span class="pill warn">na pálce</span>{/if}
             </span>
             <span class="tools">
               {#if nextSlot !== null && up !== i}

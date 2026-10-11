@@ -154,12 +154,12 @@
     height: 58px;
     flex-shrink: 0;
     border-radius: 14px;
-    background: var(--surface-2);
+    background: var(--accent-soft);
   }
   .wd {
     font-size: 12px;
     font-weight: 800;
-    color: var(--muted);
+    color: var(--accent-text);
     line-height: 1;
   }
   .dm {

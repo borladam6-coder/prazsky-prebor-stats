@@ -308,7 +308,7 @@
                   <span class="jn2">{r.player?.jersey_number ?? '–'}</span>
                   <span class="pn">
                     <a href="/hraci/{r.pid}">{r.player?.name ?? '?'}</a>
-                    {#if r.up}<span class="pill accent">na pálce</span>{/if}
+                    {#if r.up}<span class="pill warn">na pálce</span>{/if}
                     {#if r.base}<span class="pill neutral">na {r.base}. metě</span>{/if}
                     <span class="chips">{#each r.results as res, i (i)}<span class="chip-r g-{resultDef(res)?.group}">{res}</span>{/each}</span>
                   </span>
@@ -603,20 +603,16 @@
     color: var(--muted);
   }
   .g-hit {
-    background: var(--hit-soft);
-    color: var(--hit);
+    background: var(--pos-soft);
+    color: var(--pos);
   }
   .g-onbase {
-    background: var(--onbase-soft);
-    color: var(--onbase);
-  }
-  .g-out {
-    background: var(--out-soft);
-    color: var(--out);
+    background: var(--accent-soft);
+    color: var(--accent-text);
   }
   .g-run {
-    background: var(--surface-3);
-    color: var(--ink);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent-text);
   }
 
   /* ---------------------------------------------------------- line score */
