@@ -9,7 +9,7 @@
   import {
     liveOfGame, gameEntries, liveStart, liveSetLineup, liveSetState, liveFinish, liveUndo,
     gamePlayLog, liveDeletePlay, liveRewind, liveAdjustRuns, updatePlateAppearance, revertGroup,
-    errorMessage, isNetworkError, WriteCancelled
+    errorMessage, isNetworkError, WriteCancelled, testReset
   } from '#lib/api.ts';
   import { PlayQueue } from '#lib/queue.svelte.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
@@ -29,6 +29,8 @@
   import AdminPanel from '#lib/components/AdminPanel.svelte';
   import ResultPad from '#lib/components/ResultPad.svelte';
   import ScoringHints from '#lib/components/ScoringHints.svelte';
+  import TestBanner from '#lib/components/TestBanner.svelte';
+  import { isTestGame } from '#lib/testgame.ts';
   import Icon from '#lib/components/Icon.svelte';
 
   const id = $derived(Number(page.params.id));
@@ -108,8 +110,33 @@
   const pending = $derived(queue?.pending ?? 0);
   /** sessions as the scorer sees them: with plays that are still on the way */
   const sessions = $derived(
-    srvSessions.map((s) => (queue ? queue.effective(s, lineups.find((l) => l.team_id === s.team_id)?.players ?? []) : s))
+    srvSessions
+      // a finished session without any play (after a reset) counts as not started
+      .filter((s) => !(s.finished && !plays.some((p) => p.teamId === s.team_id)))
+      .map((s) => (queue ? queue.effective(s, lineups.find((l) => l.team_id === s.team_id)?.players ?? []) : s))
   );
+  const testGame = $derived(isTestGame(id));
+  let confirmReset = $state(false);
+
+  function afterTestReset() {
+    queue?.discard();
+    mode = 'score';
+    sheet = null;
+    moreOpen = false;
+    confirmReset = false;
+    lastPlay = null;
+    gameRestart = false;
+    pendingAway = null;
+    load();
+  }
+
+  const resetTest = () => {
+    if (!synced()) return;
+    run(() => testReset(), () => {
+      toasts.show('Testovací zápas je vynulovaný, můžeš začít znovu.');
+      afterTestReset();
+    });
+  };
 
   $effect(() => {
     const gameId = id;
@@ -580,8 +607,12 @@
   {:else}
     <header class="title" class:compact={!!session && !session.finished && mode === 'score'}>
       <span class="badge"><span class="pulse"></span> Živý zápis</span>
+      {#if testGame && scoringVisible}<span class="pill warn">Test</span>{/if}
       <h1>{home?.short_name ?? home?.name} – {away?.short_name ?? away?.name}</h1>
     </header>
+    {#if testGame && !scoringVisible}
+      <TestBanner onreset={afterTestReset} />
+    {/if}
 
     {#if loadError}
       <p class="empty">{loadError}</p>
@@ -893,9 +924,23 @@
               <a role="menuitem" href="/zapasy/{id}/sledovat">
                 <Icon name="live" size={18} /><span><strong>Pohled diváka</strong><small>Jak zápas vidí ostatní</small></span>
               </a>
-              <button type="button" role="menuitem" onclick={openAdmin}>
-                <Icon name="shield" size={18} /><span><strong>Správa zápasu</strong><small>Smazat záznam, ruční skóre (kód správce)</small></span>
-              </button>
+              {#if testGame}
+                {#if confirmReset}
+                  <div class="confirm">
+                    <span>Smazat vše zapsané v testovacím zápase?</span>
+                    <button type="button" class="btn btn-sm danger" disabled={busy} onclick={resetTest}>Vynulovat</button>
+                    <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmReset = false)}>Ne</button>
+                  </div>
+                {:else}
+                  <button type="button" role="menuitem" onclick={() => (confirmReset = true)}>
+                    <Icon name="undo" size={18} /><span><strong>Vynulovat testovací zápas</strong><small>Smaže vše zapsané, začneš od začátku</small></span>
+                  </button>
+                {/if}
+              {:else}
+                <button type="button" role="menuitem" onclick={openAdmin}>
+                  <Icon name="shield" size={18} /><span><strong>Správa zápasu</strong><small>Smazat záznam, ruční skóre (kód správce)</small></span>
+                </button>
+              {/if}
               <button type="button" role="menuitem" onclick={() => { moreOpen = false; hintsOpen = true; }}>
                 <Icon name="help" size={18} /><span><strong>Jak zapisovat</strong><small>Krátká nápověda</small></span>
               </button>

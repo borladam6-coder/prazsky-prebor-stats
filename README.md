@@ -12,6 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 10: sestava 9 pálkařů (přepínač „Hrajeme v 10“ pro extra hráče), krátký kód správce (aspoň 4 znaky), testovací zápas s vymyšlenými týmy pro všechny.
 - Krok 9: menu bez Historie (je v patičce a v detailu zápasu), přehled na jeden pohled (živě, další zápas, poslední výsledky, top 3 pálkaři, tabulka), hledání hráčů a týmů (lupa nebo klávesa /), na telefonu tabulky jen s hlavními sloupci (přepínač Všechny statistiky), šedé obrysy při načítání, instalace jako aplikace, rychlejší start (data z minulé návštěvy hned, čerstvá chvíli poté).
 - Krok 8: zápis bez signálu (akce čekají v telefonu), výsledková tlačítka dole pod palcem, rychlejší sestava (přetažení, pořadí z minulého zápasu), Další možnosti, nápověda, ruční zápis zamčený u týmu se živým zápisem.
 
@@ -26,13 +27,17 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 5. **Zpět** vrátí poslední akci. **Pořadí a střídání** řeší náhradníky. V **Další možnosti** je Opravit stav (náhradní běžec, špatně zapsané outy), Ukončit zápis, Pohled diváka, Správa zápasu a nápověda.
 6. V režimu celého zápasu vrací Zpět poslední akci zápasu bez ohledu na tým.
 
+**Sestava:** standardně 9 pálkařů. Zaškrtnutím „Hrajeme v 10“ jde přidat desátého (extra hráč, EP). Víc než 10 databáze nepřijme.
+
+**Testovací zápas** (Zápasy → Vyzkoušet živý zápis, nebo odkaz v patičce): týmy Testovací Lvi a Testovací Orli po 12 vymyšlených hráčích, zápas je otevřený kdykoli. Je ve vlastní sezóně (id −1), takže se nepočítá do tabulky, žebříčků, statistik, hledání, „Právě se hraje“ ani do celkové historie změn, a import ze softball.cz na něj nesahá. Tlačítko Vynulovat (může kdokoli) smaže vše zapsané a zápis začne znovu.
+
 **Bez signálu:** každá akce se nejdřív uloží v telefonu a hned se ukáže, pak se odešle. Bez signálu čeká (u poslední akce je vidět „Bez signálu · čeká N“) a odešle se sama, jakmile je připojení zpět, i po zavření a otevření stránky. Každá akce má vlastní identifikátor, takže se při opakovaném odeslání nezapíše dvakrát. Když databáze akci odmítne (např. mezitím zapsal někdo jiný), zápis se zastaví a nabídne Zkusit znovu nebo Zahodit čekající. Opravy, sestava a ukončení zápisu potřebují připojení.
 
 **Sledovat** (z přehledu, detailu zápasu nebo výběru na stránce živého zápisu) otevře pohled jen pro diváky: skóre, směna a outy, diamant s běžci, kdo je na pálce, skóre po směnách, průběh zápasu po polovinách směn a sestavy s dnešními výsledky. Aktualizuje se sám.
 
 **Opravy:** v živém zápisu je u každé akce v Průběhu zápasu tužka. Jde opravit výsledek a RBI, přidat nebo odebrat doběh v té směně, akci smazat nebo vrátit celý zápis k ní. Všechno je v historii a dá se vrátit.
 
-**Správce** (dole v detailu zápasu → Správa zápasu, odemyká se kódem správce): ruční konečné skóre (import ho nepřepíše) a smazání celého záznamu zápasu. Změny správce může vrátit jen správce. V databázi je jen bcrypt hash kódu (`private.settings.admin_code_hash`). Kód jde změnit přímo na webu. Při zapomenutí ho nastaví nový hash v SQL Editoru: `update private.settings set admin_code_hash = extensions.crypt('NOVYKOD', extensions.gen_salt('bf', 8));` (kód bez pomlček, velkými písmeny).
+**Správce** (dole v detailu zápasu → Správa zápasu, odemyká se kódem správce): ruční konečné skóre (import ho nepřepíše) a smazání celého záznamu zápasu. Změny správce může vrátit jen správce. V databázi je jen bcrypt hash kódu (`private.settings.admin_code_hash`). Kód jde změnit přímo na webu. Při zapomenutí ho nastaví nový hash v SQL Editoru: `update private.settings set admin_code_hash = extensions.crypt('NOVYKOD', extensions.gen_salt('bf', 8));` (kód bez pomlček, velkými písmeny, aspoň 4 znaky).
 
 Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny. Tým, který má v zápase živý zápis, nejde zapisovat ručně (web i databáze to odmítnou), opravuje se v průběhu zápasu. Ruční zápis zůstává pro týmy bez živého zápisu.
 
@@ -43,6 +48,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/006_lineup_admin_testgame.sql  sestava 9/10, krátký kód správce, testovací zápas
 supabase/migrations/005_offline_and_manual_lock.sql  zápis bez signálu (akce jen jednou), zámek ručního zápisu, „out“ ve zprávách
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
 netlify/functions/import-league.mts plánovaný import ze softball.cz
@@ -61,7 +67,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql` a `005_offline_and_manual_lock.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql` a `006_lineup_admin_testgame.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

@@ -16,6 +16,8 @@
   import LiveCard from '#lib/components/LiveCard.svelte';
   import Skeleton from '#lib/components/Skeleton.svelte';
   import AdminPanel from '#lib/components/AdminPanel.svelte';
+  import TestBanner from '#lib/components/TestBanner.svelte';
+  import { isTestGame } from '#lib/testgame.ts';
   import StatTable from '#lib/components/StatTable.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
   import HistoryList from '#lib/components/HistoryList.svelte';
@@ -204,7 +206,7 @@
       return;
     }
     run(
-      () => addPlayer(league.season!.id, entryTeamId!, newName, jersey),
+      () => addPlayer(game?.season_id ?? league.season!.id, entryTeamId!, newName, jersey),
       (p) => {
         league.upsertPlayer(p);
         toasts.show(`Hráč ${p.name} přidán na soupisku.`);
@@ -229,6 +231,7 @@
   {#if !game}
     <p class="empty">Zápas neexistuje.</p>
   {:else}
+    {#if isTestGame(game.id)}<TestBanner onreset={() => { load(); historyList?.reload(); }} />{/if}
     <section class="card head" aria-label="Výsledek zápasu" style:--home={home?.color} style:--away={away?.color}>
       <div class="side">
         <TeamBadge team={home} size={56} eager />
@@ -430,7 +433,9 @@
       </div>
     {/if}
 
-    <AdminPanel {game} onchanged={() => { load(); historyList?.reload(); }} />
+    {#if !isTestGame(game.id)}
+      <AdminPanel {game} onchanged={() => { load(); historyList?.reload(); }} />
+    {/if}
   {/if}
 </div>
 

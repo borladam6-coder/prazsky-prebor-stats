@@ -3,6 +3,7 @@
 
 import { supabase, configProblem } from './supabase.ts';
 import type { Game, Player, Season, Standing, Team } from './types.ts';
+import { TEST_GAME_ID, TEST_SEASON_ID } from './testgame.ts';
 
 /** Last loaded reference data, shown at once on the next visit while fresh data loads. */
 const CACHE_KEY = 'pps.league.v1';
@@ -15,6 +16,7 @@ interface Cached {
   players: Player[];
   games: Game[];
   standings: Standing[];
+  test?: { teams: Team[]; players: Player[]; games: Game[] };
 }
 
 const PLAYER_COLS = 'id, season_id, team_id, name, jersey_number, source, active, version';
@@ -26,14 +28,19 @@ class League {
   players = $state<Player[]>([]);
   games = $state<Game[]>([]);
   standings = $state<Standing[]>([]);
+  /**
+   * The test game with its two teams and players. Reachable by id (league.game(-1) …)
+   * but never part of the lists above, so it stays out of tables, statistics and search.
+   */
+  test = $state<{ teams: Team[]; players: Player[]; games: Game[] }>({ teams: [], players: [], games: [] });
   /** game id → number of teams (0–2) with recorded batting stats */
   recorded = $state<Map<number, number>>(new Map());
   status = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
   error = $state<string | null>(null);
 
-  teamById = $derived(new Map(this.teams.map((t) => [t.id, t])));
-  playerById = $derived(new Map(this.players.map((p) => [p.id, p])));
-  gameById = $derived(new Map(this.games.map((g) => [g.id, g])));
+  teamById = $derived(new Map([...this.teams, ...this.test.teams].map((t) => [t.id, t])));
+  playerById = $derived(new Map([...this.players, ...this.test.players].map((p) => [p.id, p])));
+  gameById = $derived(new Map([...this.games, ...this.test.games].map((g) => [g.id, g])));
 
   private pending: Promise<void> | null = null;
 
@@ -62,6 +69,7 @@ class League {
       this.players = c.players;
       this.games = c.games;
       this.standings = c.standings;
+      if (c.test) this.test = c.test;
       return true;
     } catch {
       return false;
@@ -76,7 +84,8 @@ class League {
         teams: $state.snapshot(this.teams),
         players: $state.snapshot(this.players),
         games: $state.snapshot(this.games),
-        standings: $state.snapshot(this.standings)
+        standings: $state.snapshot(this.standings),
+        test: $state.snapshot(this.test)
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(c));
     } catch {
@@ -97,7 +106,7 @@ class League {
       if (error) throw error;
       if (!season) throw new Error('V databázi zatím není žádná sezóna. Spusť v Netlify import (funkce import-league).');
       this.season = season;
-      await Promise.all([this.loadTeams(), this.loadPlayers(), this.loadGames(), this.loadStandings()]);
+      await Promise.all([this.loadTeams(), this.loadPlayers(), this.loadGames(), this.loadStandings(), this.loadTest()]);
       this.status = 'ready';
       this.error = null;
       this.save();
@@ -164,6 +173,21 @@ class League {
     this.standings = (data ?? []) as Standing[];
   }
 
+  /** The test game (optional: a database without migration 006 simply has none). */
+  async loadTest() {
+    const [teams, players, games] = await Promise.all([
+      supabase!.from('season_teams').select('teams(id, name, short_name, code, color, logo_url)').eq('season_id', TEST_SEASON_ID),
+      supabase!.from('players').select(PLAYER_COLS).eq('season_id', TEST_SEASON_ID).order('name'),
+      supabase!.from('games').select(GAME_COLS).eq('id', TEST_GAME_ID)
+    ]);
+    if (teams.error || players.error || games.error) return;
+    this.test = {
+      teams: (teams.data ?? []).map((r) => r.teams as unknown as Team).filter(Boolean),
+      players: (players.data ?? []) as Player[],
+      games: (games.data ?? []) as Game[]
+    };
+  }
+
   /** Which games already have stats (refreshed on demand, cheap: ≤ 2 rows per game). */
   async loadRecorded() {
     if (!this.season) return;
@@ -179,8 +203,12 @@ class League {
 
   /** Replaces or adds one player after a write (keeps the list sorted by name). */
   upsertPlayer(p: Player) {
-    const rest = this.players.filter((x) => x.id !== p.id);
-    this.players = [...rest, p].sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    const sort = (list: Player[]) => list.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    if (p.season_id === TEST_SEASON_ID) {
+      this.test = { ...this.test, players: sort([...this.test.players.filter((x) => x.id !== p.id), p]) };
+      return;
+    }
+    this.players = sort([...this.players.filter((x) => x.id !== p.id), p]);
   }
 
   team(id: number | null | undefined) {
@@ -194,7 +222,7 @@ class League {
   }
 
   teamPlayers(teamId: number, includeInactive = false) {
-    return this.players.filter((p) => p.team_id === teamId && (includeInactive || p.active));
+    return [...this.players, ...this.test.players].filter((p) => p.team_id === teamId && (includeInactive || p.active));
   }
 
   /** A game can receive statistics once it has been played (or its start time has passed). */

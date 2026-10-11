@@ -32,6 +32,10 @@
   } = $props();
 
   let order = $state<string[]>(untrack(() => [...initial]));
+  /** 9 batters, or 10 with an extra player (EP); remembered with the lineup of the game */
+  let ten = $state(untrack(() => initial.length >= 10));
+  const max = $derived(ten ? 10 : 9);
+  const tooMany = $derived(order.length > max);
   let up = $state<number | null>(untrack(() => nextSlot));
   let replacing = $state<number | null>(null);
 
@@ -47,7 +51,7 @@
     if (replacing !== null) {
       order[replacing] = id;
       replacing = null;
-    } else if (order.length < 20) {
+    } else if (order.length < max) {
       order = [...order, id];
     }
   }
@@ -142,7 +146,7 @@
     }
     adding = true;
     try {
-      const p = await addPlayer(league.season.id, teamId, newName, jersey);
+      const p = await addPlayer(league.game(gameId)?.season_id ?? league.season.id, teamId, newName, jersey);
       league.upsertPlayer(p);
       pick(p.id);
       toasts.show(`Hráč ${p.name} přidán na soupisku.`);
@@ -163,13 +167,17 @@
   <section class="card order">
     <header>
       <h2>Pořadí pálkařů</h2>
-      <span class="muted count">{order.length} / 20</span>
+      <span class="muted count" class:over={tooMany}>{order.length} / {max}</span>
     </header>
+    <label class="ten">
+      <input type="checkbox" bind:checked={ten} />
+      <span><strong>Hrajeme v 10</strong> <span class="muted">(extra hráč, EP)</span></span>
+    </label>
 
     {#if order.length === 0}
       <p class="hint muted">Klepni na hráče ze soupisky v pořadí, v jakém půjdou na pálku.</p>
       {#if previous}
-        <button type="button" class="btn btn-primary prev" onclick={() => (order = [...previous!])}>
+        <button type="button" class="btn btn-primary prev" onclick={() => { order = previous!.slice(0, 10); ten = order.length >= 10; }}>
           <Icon name="copy" size={18} /> Pořadí z minulého zápasu ({previous.length})
         </button>
       {/if}
@@ -219,7 +227,7 @@
       <ul>
         {#each roster as p (p.id)}
           <li>
-            <button type="button" onclick={() => pick(p.id)} disabled={replacing === null && order.length >= 20}>
+            <button type="button" onclick={() => pick(p.id)} disabled={replacing === null && order.length >= max}>
               <span class="jn">{p.jersey_number ?? '–'}</span>
               <span class="pn">{p.name}</span>
               <Icon name={replacing !== null ? 'swap' : 'plus'} size={18} />
@@ -245,7 +253,12 @@
 
   <div class="save">
     {#if oncancel}<button type="button" class="btn btn-dark" onclick={oncancel}>Zpět</button>{/if}
-    <button type="button" class="btn btn-primary" disabled={busy || order.length === 0} onclick={() => onsave([...order], up)}>
+    {#if tooMany}
+      <p class="warn-line" role="alert">V pořadí je {order.length} pálkařů. Odeber jednoho, nebo zapni „Hrajeme v 10“.</p>
+    {:else if order.length > 0 && order.length < max}
+      <p class="muted info-line">Zatím {order.length} z {max} pálkařů.</p>
+    {/if}
+    <button type="button" class="btn btn-primary" disabled={busy || order.length === 0 || tooMany} onclick={() => onsave([...order], up)}>
       <Icon name="check" size={18} /> {saveLabel}
     </button>
   </div>
@@ -280,6 +293,39 @@
   }
   .count {
     font-size: 13px;
+  }
+  .count.over {
+    color: var(--neg);
+    font-weight: 800;
+  }
+  .ten {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 6px 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .ten input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--accent);
+    flex: none;
+  }
+  .warn-line,
+  .info-line {
+    order: -1;
+    flex-basis: 100%;
+    margin: 0 4px 4px;
+    font-size: 13.5px;
+  }
+  .warn-line {
+    color: var(--neg);
+    font-weight: 700;
   }
   .hint {
     margin: 4px 6px 8px;
@@ -448,6 +494,7 @@
     position: sticky;
     bottom: calc(var(--nav-h) + 10px + env(safe-area-inset-bottom));
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
     padding: 10px;

@@ -19,6 +19,8 @@
   let entries = $state<ChangeEntry[]>([]);
   let loading = $state(true);
   let more = $state(false);
+  /** time of the oldest change read so far */
+  let cursor: string | null = null;
   let error = $state<string | null>(null);
   let busy = $state<string | null>(null);
 
@@ -28,7 +30,8 @@
       const r = await history({ gameId, limit });
       groups = r.groups;
       entries = r.entries;
-      more = r.groups.length === limit;
+      more = r.full;
+      cursor = r.cursor;
       error = null;
     } catch (e) {
       error = errorMessage(e);
@@ -38,14 +41,14 @@
   }
 
   async function loadMore() {
-    const last = groups.at(-1);
-    if (!last) return;
+    if (!cursor) return;
     loading = true;
     try {
-      const r = await history({ gameId, limit, before: last.at });
+      const r = await history({ gameId, limit, before: cursor });
       groups = [...groups, ...r.groups];
       entries = [...entries, ...r.entries];
-      more = r.groups.length === limit;
+      more = r.full;
+      cursor = r.cursor;
     } catch (e) {
       toasts.show(errorMessage(e), 'error');
     } finally {

@@ -5,6 +5,7 @@ import { supabase } from './supabase.ts';
 import { identity } from './identity.svelte.ts';
 import { admin } from './admin.svelte.ts';
 import { league } from './league.svelte.ts';
+import { TEST_GAME_ID, isTestGame, isTestTeam } from './testgame.ts';
 import type {
   ChangeEntry, ChangeGroup, GameExtras, LiveLineup, LiveSession, PaResult, PlateAppearance, Player,
   PlayerGameLine, PlayerTotals, TeamGameLine, TeamTotals
@@ -133,6 +134,7 @@ export async function activeLive(): Promise<LiveSession[]> {
     .from('live_sessions')
     .select(LIVE_COLS)
     .eq('finished', false)
+    .neq('game_id', TEST_GAME_ID)
     .gt('updated_at', since)
     .order('updated_at', { ascending: false });
   if (error) throw error;
@@ -178,6 +180,10 @@ export async function gamePlayLog(gameId: number, pas: PlateAppearance[] = []): 
 export interface HistoryPage {
   groups: ChangeGroup[];
   entries: ChangeEntry[];
+  /** a full page was read (there may be older changes) */
+  full: boolean;
+  /** time of the oldest group read, for the next page */
+  cursor: string | null;
 }
 
 /** Newest change groups, optionally only those touching one game. */
@@ -194,7 +200,7 @@ export async function history(opts: { before?: string; gameId?: number; limit?: 
       .limit(500);
     if (error) throw error;
     groupIds = [...new Set((data ?? []).map((r) => r.group_id as string))];
-    if (groupIds.length === 0) return { groups: [], entries: [] };
+    if (groupIds.length === 0) return { groups: [], entries: [], full: false, cursor: null };
   }
 
   let q = db()
@@ -219,7 +225,18 @@ export async function history(opts: { before?: string; gameId?: number; limit?: 
     if (e2) throw e2;
     entries = (data ?? []) as ChangeEntry[];
   }
-  return { groups: (groups ?? []) as ChangeGroup[], entries };
+  let list = (groups ?? []) as ChangeGroup[];
+  const page = { full: list.length === limit, cursor: list.at(-1)?.at ?? null };
+  if (!opts.gameId) {
+    // the test game has its own history (in the game), it does not belong to the league's
+    const isTest = (e: ChangeEntry) => isTestGame(e.game_id) || isTestTeam(e.team_id);
+    const byGroup = new Map<string, ChangeEntry[]>();
+    for (const e of entries) byGroup.set(e.group_id, [...(byGroup.get(e.group_id) ?? []), e]);
+    list = list.filter((g) => !(byGroup.get(g.id)?.length && byGroup.get(g.id)!.every(isTest)));
+    const kept = new Set(list.map((g) => g.id));
+    entries = entries.filter((e) => kept.has(e.group_id));
+  }
+  return { groups: list, entries, ...page };
 }
 
 // ------------------------------------------------------------------ writes
@@ -374,6 +391,11 @@ export const liveAdjustRuns = (gameId: number, teamId: number, inning: number, p
   call('live_adjust_runs', {
     p_game_id: gameId, p_team_id: teamId, p_inning: inning, p_player_id: playerId, p_delta: delta
   });
+
+// ------------------------------------------------------------------ test game
+
+/** Wipes everything recorded in the test game (anyone may do it). */
+export const testReset = () => call<string>('test_reset_game', {});
 
 // ------------------------------------------------------------------ administrator
 

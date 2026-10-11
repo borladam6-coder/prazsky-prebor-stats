@@ -6,6 +6,8 @@
   import { month } from '#lib/format.ts';
   import GameCard from '#lib/components/GameCard.svelte';
   import TeamBadge from '#lib/components/TeamBadge.svelte';
+  import Icon from '#lib/components/Icon.svelte';
+  import { TEST_GAME_ID } from '#lib/testgame.ts';
 
   type View = 'odehrane' | 'nadchazejici' | 'vse';
 
@@ -57,6 +59,17 @@
   <h1>Zápasy</h1>
   <p class="lead muted">Vyber odehraný zápas, otevře se jeho box score a dají se do něj zapisovat statistiky.</p>
 
+  {#if league.game(TEST_GAME_ID)}
+    <a class="card try" href="/zapasy/{TEST_GAME_ID}/zive">
+      <span class="ti"><Icon name="live" size={22} /></span>
+      <span class="tt">
+        <strong>Vyzkoušet živý zápis</strong>
+        <span class="muted">Testovací zápas s vymyšlenými týmy. Nic se nezapočítává, kdokoli ho může vynulovat.</span>
+      </span>
+      <Icon name="chevron" size={20} />
+    </a>
+  {/if}
+
   <div class="filters">
     <div class="seg views" role="group" aria-label="Které zápasy">
       {#each views as v (v.id)}
@@ -96,6 +109,40 @@
 </div>
 
 <style>
+  .try {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    margin: -8px 0 22px;
+    padding: 14px 16px;
+    text-decoration: none;
+    color: var(--ink);
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+    transition: border-color 160ms, transform 160ms;
+  }
+  .try:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .ti {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .tt {
+    display: grid;
+    gap: 2px;
+    font-size: 14px;
+  }
+  .tt strong {
+    font-size: 16px;
+  }
   .lead {
     margin: 14px 0 24px;
     max-width: 60ch;

@@ -25,7 +25,7 @@ before(async () => {
   t = await createDb();
   await t.importFixture();
   c = t.newCaller('Offline');
-  [game] = await t.q(`select * from games where status = 'played' order by id limit 1`);
+  [game] = await t.q(`select * from games where status = 'played' and id > 0 order by id limit 1`);
   home = (await t.q(`select id from players where team_id = $1 and active order by name limit 9`, [game.home_team_id])).map((p) => p.id);
   away = (await t.q(`select id from players where team_id = $1 and active order by name limit 9`, [game.away_team_id])).map((p) => p.id);
   await t.rpc(c, 'live_start', { p_game_id: game.id, p_team_id: game.away_team_id, p_lineup: away });

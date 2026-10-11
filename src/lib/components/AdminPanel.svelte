@@ -142,8 +142,8 @@
       <details class="block">
         <summary>Změnit kód správce</summary>
         <div class="row">
-          <input class="input" type="password" autocomplete="new-password" placeholder="Nový kód (aspoň 12 znaků)" bind:value={newCode} aria-label="Nový kód" />
-          <button type="button" class="btn btn-sm" disabled={busy || newCode.replace(/[^a-z0-9]/gi, '').length < 12} onclick={changeCode}>Změnit</button>
+          <input class="input" type="password" autocomplete="new-password" placeholder="Nový kód (aspoň 4 znaky)" bind:value={newCode} aria-label="Nový kód" />
+          <button type="button" class="btn btn-sm" disabled={busy || newCode.replace(/[^a-z0-9]/gi, '').length < 4} onclick={changeCode}>Změnit</button>
         </div>
       </details>
     </div>
