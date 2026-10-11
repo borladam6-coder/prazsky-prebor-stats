@@ -228,3 +228,122 @@ export function batterChoices(result: PaResult): Dest[] {
 
 export const destLabel = (d: Dest, from?: number): string =>
   d === 0 ? 'Out' : d === 4 ? 'Doběhl' : d === from ? `Zůstal (${d}.)` : `${d}. meta`;
+
+// ---------------------------------------------------------------------------------
+// Only possible destinations
+//
+// A runner can never end behind (or on the same base as) anybody who was behind him:
+// with a runner on 1st and a double (batter on 2nd) he can only be on 3rd, score,
+// or be out. The lower bound follows from the batter and the runners behind him.
+// ---------------------------------------------------------------------------------
+
+/** Possible destinations of the runner from `from`, given where everyone behind him ended. */
+export function runnerOptions(from: Base, play: Pick<Play, 'result' | 'batterTo' | 'runners'>): Dest[] {
+  const behind: Dest[] = play.runners.filter((r) => r.from < from).map((r) => r.to);
+  if (play.result && play.batterTo !== null) behind.push(play.batterTo);
+  const safe = behind.filter((d) => d !== 0);
+  if (safe.includes(4)) return [0, 4];
+  const lowest = Math.max(from, ...safe.map((d) => d + 1)) as Dest;
+  return [0, ...([1, 2, 3, 4] as Dest[]).filter((d) => d >= lowest)];
+}
+
+/**
+ * Pushes runners ahead when somebody behind them moved up (processed from the back,
+ * so a chain of forced runners moves together). Runners that are out stay out.
+ */
+export function cascade<T extends Pick<Play, 'result' | 'batterTo' | 'runners'>>(play: T): T {
+  const runners = [...play.runners].sort((a, b) => a.from - b.from);
+  const out: RunnerMove[] = [];
+  for (const r of runners) {
+    const opts = runnerOptions(r.from, { ...play, runners: out });
+    if (r.to === 0 || opts.includes(r.to)) {
+      out.push(r);
+    } else {
+      const to = opts.find((d) => d > 0 && d >= r.to) ?? opts.find((d) => d > 0) ?? 4;
+      out.push({ ...r, to, sb: r.sb && to > r.from });
+    }
+  }
+  return { ...play, runners: play.runners.map((r) => out.find((x) => x.from === r.from)!) };
+}
+
+// ---------------------------------------------------------------------------------
+// Out in the field: the scorer says what happened, the official result follows
+// ---------------------------------------------------------------------------------
+
+/** How the ball was put in play when the batting side made an out (or tried to). */
+export type FieldOut = 'fly' | 'ground' | 'fc' | 'dp' | 'bunt';
+
+export const FIELD_OUTS: { kind: FieldOut; label: string; hint: string }[] = [
+  { kind: 'fly', label: 'Do vzduchu', hint: 'Chycený odpal (fly, line, pop). Běžci zůstávají, doběh po chycení = SF.' },
+  { kind: 'ground', label: 'Po zemi', hint: 'Out pálkaře na 1. metě, vynucení běžci postoupí.' },
+  { kind: 'fc', label: 'Out běžce', hint: 'Obrana vyautovala běžce, pálkař je na metě (fielder’s choice).' },
+  { kind: 'dp', label: 'Dvojitý out', hint: 'Out pálkaře i běžce v jedné akci. Bez RBI.' },
+  { kind: 'bunt', label: 'Obětovaný bunt', hint: 'Pálkař out, běžci postoupí o metu (SH).' }
+];
+
+/** Field outs that make sense in this situation. */
+export function fieldOutsFor(bases: Bases, outs: number): FieldOut[] {
+  const on = occupied(bases).length;
+  if (!on) return [];
+  return FIELD_OUTS.map((f) => f.kind).filter((k) => (k === 'dp' ? outs < 2 : k === 'bunt' ? outs < 2 : true));
+}
+
+/** Where the batter may end in a field out of this kind. */
+export function fieldOutBatterChoices(kind: FieldOut): Dest[] {
+  return kind === 'fly' ? [0] : [0, 1];
+}
+
+/**
+ * The official result of a field out, from what happened:
+ *  - caught fly, a run scores, fewer than 2 outs before → SF (sacrifice fly)
+ *  - bunt, batter out, runners advanced, nobody else out, fewer than 2 outs → SH
+ *  - batter safe while the defence went for a runner → FC
+ *  - otherwise an out (OUT), a double play included
+ */
+export function fieldOutResult(kind: FieldOut, play: Pick<Play, 'batterTo' | 'runners'>, outsBefore: number): PaResult {
+  const runnersOut = play.runners.filter((r) => r.to === 0).length;
+  const advanced = play.runners.some((r) => r.to > r.from);
+  if (play.batterTo !== null && play.batterTo > 0) return 'FC';
+  if (kind === 'fly' && runnersOut === 0 && outsBefore < 2 && runsOn(play) > 0) return 'SF';
+  if (kind === 'bunt' && runnersOut === 0 && outsBefore < 2 && advanced) return 'SH';
+  return 'OUT';
+}
+
+/** The usual course of a field out of this kind (the scorer adjusts the rest). */
+export function defaultFieldOut(kind: FieldOut, bases: Bases, outs: number): Play {
+  const on = occupied(bases);
+  const f = forced(bases);
+  const moves = new Map<Base, Dest>(on.map((b) => [b, b as Dest]));
+  let batterTo: Dest = 0;
+  // the runner thrown out on a force play: from 1st if there is one, else the lead runner
+  const victim: Base | undefined = bases[0] ? 1 : on[on.length - 1];
+
+  switch (kind) {
+    case 'fly':
+      break; // runners hold; a tag-up is set by the scorer
+    case 'ground':
+      for (const b of on) if (f.has(b)) moves.set(b, clamp(b + 1));
+      break;
+    case 'fc':
+      batterTo = 1;
+      if (victim) moves.set(victim, 0);
+      for (const b of on) if (b !== victim && f.has(b)) moves.set(b, clamp(b + 1));
+      break;
+    case 'dp':
+      if (victim) moves.set(victim, 0);
+      for (const b of on) if (b !== victim && f.has(b)) moves.set(b, clamp(b + 1));
+      break;
+    case 'bunt':
+      for (const b of on) moves.set(b, clamp(b + 1));
+      break;
+  }
+
+  let runners: RunnerMove[] = on.map((b) => ({ from: b, to: moves.get(b)! }));
+  const playOuts = (batterTo === 0 ? 1 : 0) + runners.filter((r) => r.to === 0).length;
+  if (outs + playOuts >= 3) runners = runners.map((r) => (r.to === 0 ? r : { ...r, to: r.from }));
+
+  const base = { batterTo, runners };
+  const play: Play = { result: fieldOutResult(kind, base, outs), batterTo, runners, rbi: 0 };
+  play.rbi = defaultRbi(play);
+  return cascade(play);
+}

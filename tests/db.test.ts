@@ -129,30 +129,36 @@ test('import stores only allowed data and is idempotent', async () => {
   assert.equal(groupsAfter, groupsBefore, 'a no-op import creates no history');
 });
 
-test('import updates renamed players, deactivates removed ones, skips failed rosters', async () => {
+test('rosters are only a starting list: later imports never rename, add or hide players', async () => {
   const renamedId = rosterId(196, 3);
   const removedId = rosterId(196, 4);
-  const untouchedTeamPlayer = rosterId(129, 2);
-  const { summary, warnings } = await importFixture({
+  const [before] = await q(`select name from players where external_id = $1`, [renamedId]);
+  const { summary } = await importFixture({
     renamed: { [renamedId]: 'Nové Jméno' },
-    removedRosterIds: [removedId, untouchedTeamPlayer],
-    failingRosterTeamIds: [129]
+    removedRosterIds: [removedId]
   });
-  assert.equal(warnings.length, 1);
-  assert.equal(summary.players_changed, 1);
-  assert.equal(summary.players_removed, 1);
-
+  assert.equal(summary.players_changed, 0);
+  assert.equal(summary.players_removed, 0);
   const [renamed] = await q(`select name, active from players where external_id = $1`, [renamedId]);
-  assert.deepEqual(renamed, { name: 'Nové Jméno', active: true });
+  assert.deepEqual(renamed, { name: before.name, active: true }, 'the web owns the roster');
   const [removed] = await q(`select active from players where external_id = $1`, [removedId]);
-  assert.equal(removed.active, false);
-  const [untouched] = await q(`select active from players where external_id = $1`, [untouchedTeamPlayer]);
-  assert.equal(untouched.active, true, 'team with a failed roster download is left alone');
+  assert.equal(removed.active, true, 'nobody is hidden by the import');
+});
 
-  // back to the original roster
-  await importFixture();
-  const [back] = await q(`select name, active from players where external_id = $1`, [removedId]);
-  assert.equal(back.active, true);
+test('a team whose roster failed at the start gets it with the next import', async () => {
+  const { createDb } = await import('./harness.ts');
+  const t2 = await createDb();
+  const first = await t2.importFixture({ failingRosterTeamIds: [129] });
+  assert.equal(first.warnings.length, 1);
+  const [{ n: none }] = await t2.q(`select count(*)::int n from players where team_id = 129`);
+  assert.equal(none, 0);
+  await t2.importFixture();
+  const [{ n }] = await t2.q(`select count(*)::int n from players where team_id = 129`);
+  assert.ok(n > 0);
+  const [{ n: others }] = await t2.q(`select count(*)::int n from players where team_id = 196`);
+  await t2.importFixture({ renamed: { [rosterId(196, 1)]: 'Jiné Jméno' } });
+  const [{ n: same }] = await t2.q(`select count(*)::int n from players where team_id = 196`);
+  assert.equal(same, others);
 });
 
 // ----------------------------------------------------------------- security

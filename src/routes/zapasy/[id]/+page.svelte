@@ -46,6 +46,7 @@
     )
   );
 
+  const mismatch = $derived(game ? league.scoreMismatch(game, runsByTeam) : []);
   let lines = $state<PlayerGameLine[]>([]);
   let pas = $state<PlateAppearance[]>([]);
   let extras = $state<GameExtras[]>([]);
@@ -252,6 +253,12 @@
       </div>
       <p class="info">
         {#if game.score_override}<span class="pill warn override">skóre upravil správce</span><br />{/if}
+        {#if mismatch.length}
+          <span class="mismatch" title="Jen upozornění, nic se nemění">
+            Nesedí s výsledkem svazu:
+            {#each mismatch as m, i (m.teamId)}{i ? ', ' : ' '}{league.team(m.teamId)?.short_name ?? league.team(m.teamId)?.name} {m.ours} v zápisu, oficiálně {m.official}{/each}
+          </span><br />
+        {/if}
         {longDate(game.starts_at)}{game.starts_at ? `, ${time(game.starts_at)}` : ''}{game.venue ? `, ${game.venue}` : ''}
       </p>
     </section>
@@ -451,6 +458,16 @@
   }
   .back:hover {
     color: var(--ink);
+  }
+  .mismatch {
+    display: inline-block;
+    margin-bottom: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: 13px;
+    font-weight: 700;
   }
 
   .locked {

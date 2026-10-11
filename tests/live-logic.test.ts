@@ -3,7 +3,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultPlay, validatePlay, applyPlay, runsOn, type Bases, type Play } from '../src/lib/live.ts';
+import { defaultPlay, defaultRbi, validatePlay, applyPlay, runsOn, outsOn, type Bases, type Play } from '../src/lib/live.ts';
+
+const defaultRbiOf = (p: Play) => defaultRbi(p);
 import type { PaResult } from '../src/lib/types.ts';
 
 const EMPTY: Bases = [null, null, null];
@@ -98,6 +100,89 @@ test('defaults are always valid', () => {
           r === 'SF' && !b[2] ? /aspoň jeden/ : null;
         if (expected) assert.match(err ?? '', expected, `${r} ${JSON.stringify(b)} ${outs}`);
         else assert.equal(err, null, `${r} ${JSON.stringify(b)} ${outs}`);
+      }
+    }
+  }
+});
+
+// ------------------------------------------------------------------ only possible destinations
+import { runnerOptions, cascade, defaultFieldOut, fieldOutResult, fieldOutsFor, type FieldOut } from '../src/lib/live.ts';
+
+test('runner on 1st and a double: only 3rd, home or out', () => {
+  const p = defaultPlay('2B', ['x', null, null], 0);
+  assert.deepEqual(runnerOptions(1, p), [0, 3, 4]);
+  const single = defaultPlay('1B', ['x', 'y', null], 0);
+  assert.deepEqual(runnerOptions(1, single), [0, 2, 3, 4], 'forced off 1st');
+  assert.deepEqual(runnerOptions(2, single), [0, 3, 4], 'the runner behind him took 2nd');
+  assert.deepEqual(runnerOptions(3, defaultPlay('HR', LOADED, 0)), [0, 4]);
+  // stealing: nobody behind
+  assert.deepEqual(runnerOptions(2, { result: null, batterTo: null, runners: [{ from: 2, to: 2 }] }), [0, 2, 3, 4]);
+});
+
+test('moving a runner up pushes the runners ahead of him', () => {
+  const p = defaultPlay('1B', LOADED, 0); // 1→2, 2→3, 3→4
+  const moved = cascade({ ...p, runners: p.runners.map((r) => (r.from === 1 ? { ...r, to: 3 as const } : r)) });
+  assert.deepEqual(dests(moved), { 1: 3, 2: 4, 3: 4 });
+  const batter = cascade({ ...defaultPlay('1B', ['x', null, 'z'], 0), batterTo: 3 as const });
+  assert.deepEqual(dests(batter), { 1: 4, 3: 4 }, 'batter stretched to 3rd: everyone ahead scores');
+  // a runner thrown out does not push anybody
+  const outRunner = cascade({ ...p, runners: p.runners.map((r) => (r.from === 1 ? { ...r, to: 0 as const } : r)) });
+  assert.deepEqual(dests(outRunner), { 1: 0, 2: 3, 3: 4 });
+});
+
+test('every combination of choices offered stays valid after the cascade', () => {
+  const all: Bases[] = [];
+  for (let m = 1; m < 8; m++) all.push([m & 1 ? 'x' : null, m & 2 ? 'y' : null, m & 4 ? 'z' : null]);
+  for (const r of ['1B', '2B', '3B', 'BB', 'ROE'] as PaResult[]) {
+    for (const b of all) {
+      const p = defaultPlay(r, b, 0);
+      for (const run of p.runners) {
+        for (const to of runnerOptions(run.from, p)) {
+          const q = cascade({ ...p, runners: p.runners.map((x) => (x.from === run.from ? { ...x, to } : x)) });
+          const fixed = { ...q, rbi: Math.min(q.rbi, runsOn(q)) };
+          assert.equal(validatePlay(fixed, b, 0), null, `${r} ${JSON.stringify(b)} runner ${run.from}→${to}`);
+        }
+      }
+    }
+  }
+});
+
+test('field outs: the official result follows from what happened', () => {
+  // caught fly, runner tags up from 3rd and scores, 1 out → SF with 1 RBI
+  const fly = defaultFieldOut('fly', [null, null, 'z'], 1);
+  assert.equal(fly.result, 'OUT', 'runner holds by default');
+  const tag = { ...fly, runners: [{ from: 3 as const, to: 4 as const }] };
+  assert.equal(fieldOutResult('fly', tag, 1), 'SF');
+  assert.equal(fieldOutResult('fly', tag, 2), 'OUT', 'with 2 outs there is no sacrifice');
+  // bunt moves the runners up → SH
+  const bunt = defaultFieldOut('bunt', ['x', null, null], 0);
+  assert.equal(bunt.result, 'SH');
+  assert.deepEqual(dests(bunt), { 1: 2 });
+  // runner forced out at 2nd, batter safe → FC
+  const fc = defaultFieldOut('fc', ['x', null, null], 0);
+  assert.equal(fc.result, 'FC');
+  assert.equal(fc.batterTo, 1);
+  // double play: two outs, a run scores from 3rd, no RBI
+  const dp = defaultFieldOut('dp', ['x', null, 'z'], 0);
+  assert.equal(dp.result, 'OUT');
+  assert.equal(outsOn(dp), 2);
+  const dpRun = { ...dp, runners: dp.runners.map((r) => (r.from === 3 ? { ...r, to: 4 as const } : r)) };
+  assert.equal(defaultRbiOf(dpRun), 0, 'no RBI on a double play');
+  // ground out with runners on 1st and 3rd: forced runner to 2nd, the one on 3rd holds
+  const g = defaultFieldOut('ground', ['x', null, 'z'], 0);
+  assert.deepEqual(dests(g), { 1: 2, 3: 3 });
+  // what is offered
+  assert.deepEqual(fieldOutsFor([null, null, null], 0), []);
+  assert.deepEqual(fieldOutsFor(['x', null, null], 2), ['fly', 'ground', 'fc']);
+});
+
+test('field out defaults are always valid', () => {
+  for (let m = 1; m < 8; m++) {
+    const b: Bases = [m & 1 ? 'x' : null, m & 2 ? 'y' : null, m & 4 ? 'z' : null];
+    for (const outs of [0, 1, 2]) {
+      for (const k of fieldOutsFor(b, outs) as FieldOut[]) {
+        const p = defaultFieldOut(k, b, outs);
+        assert.equal(validatePlay(p, b, outs), null, `${k} ${JSON.stringify(b)} ${outs}`);
       }
     }
   }
