@@ -44,6 +44,8 @@ export interface PlayItem {
   /** this play made the third out */
   inningEnded: boolean;
   batter: string | null;
+  /** where the batter ended (0 out, 1–3 base, 4 scored); null = unknown (inning ended) or no batter */
+  batterTo: number | null;
   result: PaResult | null;
   rbi: number;
   scored: string[];
@@ -79,7 +81,7 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
       plays.push({
         id: g.id, kind: 'adjust', paId: null, edited: false, paDeleted: false,
         at: g.at, actor: g.actor_name, teamId: num(a.team_id), inning: num(a.inning),
-        outsBefore: 0, outsAfter: 0, inningEnded: false, batter: null, result: null, rbi: 0,
+        outsBefore: 0, outsAfter: 0, inningEnded: false, batter: null, batterTo: null, result: null, rbi: 0,
         scored: delta > 0 ? [player] : [], removed: delta < 0 ? [player] : [], stole: [], runs: delta, outs: 0
       });
       continue;
@@ -102,6 +104,11 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
       for (let i = num(before.stolen_bases); i < num(e.new_data.stolen_bases); i++) stole.push(player);
     }
 
+    const batterId = pa ? String(pa.new_data.player_id) : null;
+    const batterTo = !batterId ? null
+      : scored.includes(batterId) ? 4
+      : n.runner_1 === batterId ? 1 : n.runner_2 === batterId ? 2 : n.runner_3 === batterId ? 3
+      : inningEnded ? null : 0;
     const outsBefore = num(o.outs);
     const outsAfter = inningEnded ? 3 : num(n.outs);
     const paId = pa ? String(pa.new_data.id) : null;
@@ -123,7 +130,8 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
       outsBefore,
       outsAfter,
       inningEnded,
-      batter: pa ? String(pa.new_data.player_id) : null,
+      batter: batterId,
+      batterTo,
       result: now && !now.deleted ? now.result : recorded,
       rbi: now && !now.deleted ? now.rbi : recordedRbi,
       scored,

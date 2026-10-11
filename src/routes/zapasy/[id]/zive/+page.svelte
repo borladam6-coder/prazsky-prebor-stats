@@ -8,7 +8,7 @@
   import { supabase } from '#lib/supabase.ts';
   import {
     liveOfGame, gameEntries, liveStart, liveSetLineup, liveSetState, liveFinish, liveUndo,
-    gamePlayLog, liveDeletePlay, liveRewind, liveAdjustRuns, updatePlateAppearance, revertGroup,
+    gamePlayLog, liveDeletePlay, liveDeleteFrom, liveRewind, liveAdjustRuns, updatePlateAppearance, revertGroup,
     errorMessage, isNetworkError, WriteCancelled, testReset
   } from '#lib/api.ts';
   import { PlayQueue } from '#lib/queue.svelte.ts';
@@ -546,10 +546,37 @@
   const deletePlay = () => {
     const p = editing;
     if (!p) return;
+    lastWasUndo = true;
     run(() => liveDeletePlay(id, p.id), () => {
-      lastPlay = 'Akce smazána.';
+      lastPlay = 'Akce smazána, stav je jako před ní.';
+      lastSaved = false;
       closeEdit();
     });
+  };
+
+  const deleteFrom = () => {
+    const p = editing;
+    if (!p) return;
+    lastWasUndo = true;
+    run(() => liveDeleteFrom(id, p.id), (n) => {
+      lastPlay = `Smazáno ${n} ${plural(n, ['akce', 'akce', 'akcí'])}, stav je jako před vybranou akcí.`;
+      lastSaved = false;
+      closeEdit();
+    });
+  };
+
+  /** the latest play once more: take it back and open the sheet with the same result */
+  const redo = async (result: PaResult | null) => {
+    const p = editing;
+    if (!p) return;
+    lastWasUndo = true;
+    const ok = await run(() => liveDeletePlay(id, p.id), () => {
+      closeEdit();
+      lastPlay = 'Akce smazána, zapiš ji znovu.';
+      lastSaved = false;
+    });
+    // open the sheet only now: it starts from the state before the play (loaded by run)
+    if (ok) sheet = { result, runnerFrom: null };
   };
 
   const rewind = () => {
@@ -987,6 +1014,8 @@
     onsaveresult={saveResult}
     onadjust={adjust}
     ondelete={deletePlay}
+    ondeletefrom={deleteFrom}
+    onredo={scoringVisible || (session && !session.finished) ? redo : undefined}
     onrewind={rewind}
     oncanceladjust={cancelAdjust}
     onclose={closeEdit}

@@ -12,6 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 11: smazání nebo vrácení akce vrátí přesně stav před ní (běžci, outy, pálkař), Zpět funguje i po opravách akce, starší akce jde smazat jen „od této akce“, oprava výsledku nabízí jen výsledky, které sedí na stav na metách.
 - Krok 10: sestava 9 pálkařů (přepínač „Hrajeme v 10“ pro extra hráče), krátký kód správce (aspoň 4 znaky), testovací zápas s vymyšlenými týmy pro všechny.
 - Krok 9: menu bez Historie (je v patičce a v detailu zápasu), přehled na jeden pohled (živě, další zápas, poslední výsledky, top 3 pálkaři, tabulka), hledání hráčů a týmů (lupa nebo klávesa /), na telefonu tabulky jen s hlavními sloupci (přepínač Všechny statistiky), šedé obrysy při načítání, instalace jako aplikace, rychlejší start (data z minulé návštěvy hned, čerstvá chvíli poté).
 - Krok 8: zápis bez signálu (akce čekají v telefonu), výsledková tlačítka dole pod palcem, rychlejší sestava (přetažení, pořadí z minulého zápasu), Další možnosti, nápověda, ruční zápis zamčený u týmu se živým zápisem.
@@ -35,7 +36,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Sledovat** (z přehledu, detailu zápasu nebo výběru na stránce živého zápisu) otevře pohled jen pro diváky: skóre, směna a outy, diamant s běžci, kdo je na pálce, skóre po směnách, průběh zápasu po polovinách směn a sestavy s dnešními výsledky. Aktualizuje se sám.
 
-**Opravy:** v živém zápisu je u každé akce v Průběhu zápasu tužka. Jde opravit výsledek a RBI, přidat nebo odebrat doběh v té směně, akci smazat nebo vrátit celý zápis k ní. Všechno je v historii a dá se vrátit.
+**Opravy:** v živém zápisu je u každé akce v Průběhu zápasu tužka. U poslední akce: Smazat akci (vše se vrátí přesně do stavu před ní, i běžci, outy a pálkař na řadě) nebo Zapsat znovu. U starší akce: Smazat od této akce (smaže ji i všechny pozdější) nebo Vrátit zápis sem. Výsledek a RBI jde opravit jen na hodnoty, které sedí na to, co se stalo na metách. Doběh jde přidat nebo odebrat v dané směně. Zpět funguje i po opravách, střídání a korekci doběhů. Všechno je v historii a dá se vrátit.
 
 **Správce** (dole v detailu zápasu → Správa zápasu, odemyká se kódem správce): ruční konečné skóre (import ho nepřepíše) a smazání celého záznamu zápasu. Změny správce může vrátit jen správce. V databázi je jen bcrypt hash kódu (`private.settings.admin_code_hash`). Kód jde změnit přímo na webu. Při zapomenutí ho nastaví nový hash v SQL Editoru: `update private.settings set admin_code_hash = extensions.crypt('NOVYKOD', extensions.gen_salt('bf', 8));` (kód bez pomlček, velkými písmeny, aspoň 4 znaky).
 
@@ -48,6 +49,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/007_exact_undo.sql  vrácení akce = přesně stav před ní
 supabase/migrations/006_lineup_admin_testgame.sql  sestava 9/10, krátký kód správce, testovací zápas
 supabase/migrations/005_offline_and_manual_lock.sql  zápis bez signálu (akce jen jednou), zámek ručního zápisu, „out“ ve zprávách
 supabase/tests/consistency.sql     kontrola konzistence (prázdný výsledek = vše v pořádku)
@@ -67,7 +69,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql` a `006_lineup_admin_testgame.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql` a `007_exact_undo.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

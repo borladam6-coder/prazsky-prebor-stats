@@ -1,10 +1,13 @@
 <script lang="ts">
-  // Corrections of one play of the live scoring: result and RBI, runs in its inning,
-  // delete the play, or rewind the game to it. Everything is logged and revertable.
+  // Corrections of one play of the live scoring. The result can change only to one that
+  // fits what happened on the bases (a single cannot become a strikeout afterwards);
+  // anything else is done by taking plays back, which restores the exact state before
+  // them. Everything is logged and revertable.
   import { untrack } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { league } from '../league.svelte.ts';
   import { RESULTS } from '../stats.ts';
+  import { BATTER_RANGE } from '../live.ts';
   import type { PlayItem } from '../plays.ts';
   import type { PaResult, PlateAppearance } from '../types.ts';
   import Icon from './Icon.svelte';
@@ -19,6 +22,8 @@
     onsaveresult,
     onadjust,
     ondelete,
+    ondeletefrom,
+    onredo = undefined,
     onrewind,
     oncanceladjust,
     onclose
@@ -33,7 +38,12 @@
     busy?: boolean;
     onsaveresult: (pa: PlateAppearance, result: PaResult, rbi: number) => void;
     onadjust: (playerId: string, delta: 1 | -1) => void;
+    /** the latest play only: take it back (state before it) */
     ondelete: () => void;
+    /** an older play: take it and every later play back */
+    ondeletefrom: () => void;
+    /** the latest play while scoring: take it back and record it again */
+    onredo?: (result: PaResult | null) => void;
     onrewind: () => void;
     oncanceladjust: () => void;
     onclose: () => void;
@@ -42,7 +52,7 @@
   let result = $state<PaResult>(untrack(() => pa?.result ?? '1B'));
   let rbi = $state(untrack(() => pa?.rbi ?? 0));
   let addPlayer = $state('');
-  let confirm = $state<'delete' | 'rewind' | null>(null);
+  let confirm = $state<'delete' | 'deletefrom' | 'rewind' | null>(null);
 
   const changed = $derived(!!pa && (result !== pa.result || rbi !== pa.rbi));
   const team = $derived(league.team(play.teamId));
@@ -52,7 +62,19 @@
       .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
   );
   const name = (pid: string | null) => league.player(pid)?.name ?? '?';
-  const minRbi = $derived(result === 'HR' || result === 'SF' ? 1 : 0);
+  // results that fit the play as recorded on the bases
+  const fits = (code: PaResult) => {
+    if (code === pa?.result) return true;
+    const [lo, hi] = BATTER_RANGE[code];
+    const dest = play.batterTo;
+    if (dest === null ? code === 'HR' : dest < lo || dest > hi) return false;
+    if ((code === 'SF' || code === 'SH') && play.outsBefore >= 2) return false;
+    if (code === 'SF' && play.runs - (dest === 4 ? 1 : 0) < 1) return false;
+    return true;
+  };
+  const choices = $derived(RESULTS.filter((r) => fits(r.code)));
+  const maxRbi = $derived(Math.min(4, play.runs));
+  const minRbi = $derived((result === 'HR' || result === 'SF') && play.runs > 0 ? 1 : 0);
 
   $effect(() => {
     if (rbi < minRbi) rbi = minRbi;
@@ -87,19 +109,22 @@
         <h3>Výsledek pálkaře</h3>
         <div class="row">
           <select class="select" bind:value={result} aria-label="Výsledek">
-            {#each RESULTS as r (r.code)}<option value={r.code}>{r.code} – {r.label}</option>{/each}
+            {#each choices as r (r.code)}<option value={r.code}>{r.code} – {r.label}</option>{/each}
           </select>
           <span class="step" aria-label="RBI">
             <span class="sl">RBI</span>
             <button type="button" aria-label="Ubrat RBI" disabled={rbi <= minRbi} onclick={() => rbi--}><Icon name="minus" size={16} /></button>
             <span class="val">{rbi}</span>
-            <button type="button" aria-label="Přidat RBI" disabled={rbi >= 4} onclick={() => rbi++}><Icon name="plus" size={16} /></button>
+            <button type="button" aria-label="Přidat RBI" disabled={rbi >= maxRbi} onclick={() => rbi++}><Icon name="plus" size={16} /></button>
           </span>
         </div>
         <button type="button" class="btn btn-primary btn-sm save" disabled={!changed || busy} onclick={() => onsaveresult(pa, result, rbi)}>
           <Icon name="check" size={16} /> Uložit výsledek
         </button>
-        <p class="hint muted">Mění jen statistiku pálkaře. Pozice běžců na metách zůstanou.</p>
+        <p class="hint muted">
+          Nabízí se jen výsledky, které sedí na to, co se stalo na metách.
+          {#if isLatest && onredo}Jinak to bylo? Dej <strong>Zapsat znovu</strong>.{:else}Jinak to bylo? Smaž akci od této a zapiš znovu.{/if}
+        </p>
       </section>
     {:else if play.result}
       <p class="hint muted">Zápis tohoto pálkaře už byl smazaný.</p>
@@ -133,25 +158,41 @@
 
     <section class="danger">
       {#if confirm === 'delete'}
-        <p><strong>Smazat tuto akci?</strong> Zmizí její zápis pálkaře, doběhy i ukradené mety. Stav na metách se nemění.</p>
+        <p><strong>Smazat tuto akci?</strong> Všechno se vrátí přesně do stavu před ní: statistiky, běžci na metách, outy i pálkař na řadě.</p>
         <div class="actions">
           <button type="button" class="btn btn-quiet" onclick={() => (confirm = null)}>Ne</button>
           <button type="button" class="btn danger-btn" disabled={busy} onclick={ondelete}>Ano, smazat akci</button>
         </div>
+      {:else if confirm === 'deletefrom'}
+        <p><strong>Smazat tuto akci a všechny po ní?</strong> Zápis se vrátí do stavu před touto akcí a pokračuje odsud.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-quiet" onclick={() => (confirm = null)}>Ne</button>
+          <button type="button" class="btn danger-btn" disabled={busy} onclick={ondeletefrom}>Ano, smazat od této akce</button>
+        </div>
       {:else if confirm === 'rewind'}
-        <p><strong>Vrátit zápis k této akci?</strong> Všechny pozdější akce zápasu se vrátí a zápis bude pokračovat odsud.</p>
+        <p><strong>Vrátit zápis k této akci?</strong> Tahle akce zůstane, všechny pozdější se smažou a zápis bude pokračovat odsud.</p>
         <div class="actions">
           <button type="button" class="btn btn-quiet" onclick={() => (confirm = null)}>Ne</button>
           <button type="button" class="btn danger-btn" disabled={busy} onclick={onrewind}>Ano, vrátit sem</button>
         </div>
       {:else}
         <div class="actions start">
-          <button type="button" class="btn btn-sm" onclick={() => (confirm = 'delete')}><Icon name="trash" size={16} /> Smazat akci</button>
-          {#if canRewind && !isLatest}
-            <button type="button" class="btn btn-sm" onclick={() => (confirm = 'rewind')}><Icon name="undo" size={16} /> Vrátit zápis sem</button>
+          {#if isLatest}
+            {#if onredo}
+              <button type="button" class="btn btn-sm" disabled={busy} onclick={() => onredo(play.result)}><Icon name="pencil" size={16} /> Zapsat znovu</button>
+            {/if}
+            <button type="button" class="btn btn-sm" onclick={() => (confirm = 'delete')}><Icon name="trash" size={16} /> Smazat akci</button>
+          {:else}
+            <button type="button" class="btn btn-sm" onclick={() => (confirm = 'deletefrom')}><Icon name="trash" size={16} /> Smazat od této akce</button>
+            {#if canRewind}
+              <button type="button" class="btn btn-sm" onclick={() => (confirm = 'rewind')}><Icon name="undo" size={16} /> Vrátit zápis sem</button>
+            {/if}
           {/if}
         </div>
-        <p class="hint muted">Všechno se zapíše do historie a dá se vrátit.</p>
+        <p class="hint muted">
+          {#if isLatest}Smazání vrátí stav před akcí. Zapsat znovu ji smaže a hned otevře nový zápis.{:else}Starší akci nejde smazat samotnou, další akce na ní stavěly.{/if}
+          Všechno je v historii.
+        </p>
       {/if}
     </section>
   {/if}

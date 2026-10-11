@@ -103,41 +103,42 @@ test('a run correction in an inning shows in the box score and in the line score
   assert.deepEqual(await lineTotals(), await runsByTeam());
 });
 
-test('deleting a play in the middle removes its stats; undo of later plays still works', async () => {
+test('only the latest play can be deleted, and deleting it restores the state before it', async () => {
   // runner on 2nd (away[1]); HR by away[2] scores both
   await play(game.away_team_id, 'HR', 4, [{ from: 2, to: 4 }]);
   const hrPlay = await lastPlayGroup();
   await play(game.away_team_id, 'BB', 1); // away[3] walks
+  const beforeSingle = await session(game.away_team_id);
+  const boxBeforeSingle = await box();
   await play(game.away_team_id, '1B', 1, [{ from: 1, to: 2 }]); // away[4]
-  const before = await box();
-  assert.equal(before[away[2]].hr, 1);
-  assert.equal(before[away[2]].r, 1);
-  assert.equal(before[away[1]].r, 1);
+  const single = await lastPlayGroup();
 
-  await t.rpc(c, 'live_delete_play', { p_game_id: game.id, p_group_id: hrPlay });
-  const after = await box();
-  assert.equal(after[away[2]]?.pa ?? 0, 0, 'the plate appearance is gone');
-  assert.equal(after[away[2]]?.r ?? 0, 0, 'the home run run is gone');
-  assert.equal(after[away[1]].r, 0, 'the runner run is gone');
-  assert.equal(after[away[4]].pa, 1, 'later plays stay');
-  assert.ok(!(await playLog()).some((p) => p.id === hrPlay), 'not in the play log');
-  await expectError(t.rpc(c, 'live_delete_play', { p_game_id: game.id, p_group_id: hrPlay }), /už byla vrácena/);
+  await expectError(t.rpc(c, 'live_delete_play', { p_game_id: game.id, p_group_id: hrPlay }), /jen poslední akci/);
 
-  // undo of the last play still works (counters are reverted relatively)
+  await t.rpc(c, 'live_delete_play', { p_game_id: game.id, p_group_id: single });
+  const now = await session(game.away_team_id);
+  const pick = (s: Row) => [s.inning, s.outs, s.runner_1, s.runner_2, s.runner_3, s.next_slot];
+  assert.deepEqual(pick(now), pick(beforeSingle), 'runners, outs and batter up as before the single');
+  assert.deepEqual(await box(), boxBeforeSingle);
+  assert.ok(!(await playLog()).some((p) => p.id === single), 'not in the play log');
+  await expectError(t.rpc(c, 'live_delete_play', { p_game_id: game.id, p_group_id: single }), /už byla vrácena/);
+
+  // undo right after works (no "changed since" conflict)
   await t.rpc(c, 'live_undo', { p_game_id: game.id, p_team_id: null });
-  assert.equal((await box())[away[4]]?.pa ?? 0, 0);
+  assert.equal((await box())[away[3]]?.pa ?? 0, 0, 'the walk is taken back too');
   assert.deepEqual(await t.as('anon', CONSISTENCY), []);
   assert.deepEqual(await lineTotals(), await runsByTeam());
 });
 
-test('a deleted play comes back when the deletion is reverted', async () => {
-  const [del] = await t.q(`select id from change_groups where action = 'live_delete_play' order by at desc limit 1`);
-  await t.rpc(c, 'revert_change_group', { p_group_id: del.id, p_force: false });
-  const b = await box();
-  assert.equal(b[away[2]].hr, 1);
-  assert.equal(b[away[2]].r, 1);
-  assert.equal(b[away[1]].r, 1);
-  assert.equal((await playLog()).filter((p) => p.result === 'HR').length, 1);
+test('a deleted play comes back with its state when the deletion is reverted', async () => {
+  await play(game.away_team_id, 'BB', 1); // away[3] walks again
+  const s0 = await session(game.away_team_id);
+  const del = (await t.rpc(c, 'live_delete_play', { p_game_id: game.id, p_group_id: await lastPlayGroup() })) as unknown as string;
+  assert.equal((await session(game.away_team_id)).runner_1, null);
+  await t.rpc(c, 'revert_change_group', { p_group_id: del, p_force: false });
+  const s1 = await session(game.away_team_id);
+  assert.deepEqual([s1.runner_1, s1.next_slot], [s0.runner_1, s0.next_slot]);
+  assert.equal((await playLog()).filter((p) => p.result === 'BB').length, 1);
   assert.deepEqual(await lineTotals(), await runsByTeam());
 });
 
