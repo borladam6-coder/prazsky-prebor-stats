@@ -6,6 +6,7 @@
   import { resultDef } from '../stats.ts';
   import { plural } from '../format.ts';
   import { byHalfInning, type PlayItem } from '../plays.ts';
+  import { narrate, halfSummary } from '../narrate.ts';
   import TeamBadge from './TeamBadge.svelte';
   import Icon from './Icon.svelte';
 
@@ -22,6 +23,7 @@
   const halves = $derived(byHalfInning(plays));
   const name = (pid: string | null) => league.player(pid)?.name ?? '?';
   const short = (pid: string | null) => name(pid).split(' ')[0];
+  const summary = (plays: PlayItem[]) => halfSummary([...plays].reverse());
 </script>
 
 {#if halves.length === 0}
@@ -29,6 +31,7 @@
 {:else}
   {#each halves as h (h.key)}
     {@const t = league.team(h.teamId)}
+    {@const sum = summary(h.plays)}
     <div class="half" style:--team={t?.color}>
       <header>
         <span class="hn">{h.inning}. směna {h.teamId === awayTeamId ? '▲' : '▼'}</span>
@@ -50,7 +53,9 @@
             {:else}
               <span class="chip g-{p.result ? resultDef(p.result)?.group : 'run'}">{p.result ?? 'SB'}</span>
               <span class="desc">
-                {#if p.result}
+                {#if p.detail && !p.paDeleted}
+                  <span class="story">{narrate(p.detail, p.result, name)}</span>
+                {:else if p.result}
                   <span><strong>{name(p.batter)}</strong> <span class="muted">{resultDef(p.result)?.label}</span></span>
                 {:else}
                   <strong>Pohyb běžců</strong>
@@ -58,8 +63,8 @@
                 <span class="extra">
                   {#if p.edited}<span class="tag">upraveno</span>{/if}
                   {#if p.paDeleted}<span class="tag">zápis smazán</span>{/if}
-                  {#if p.stole.length}<span>stolen base: {p.stole.map(short).join(', ')}</span>{/if}
-                  {#if p.scored.length}<span class="sc">run: {p.scored.map(short).join(', ')}</span>{/if}
+                  {#if !p.detail && p.stole.length}<span>stolen base: {p.stole.map(short).join(', ')}</span>{/if}
+                  {#if !p.detail && p.scored.length}<span class="sc">run: {p.scored.map(short).join(', ')}</span>{/if}
                   {#if p.rbi}<span>{p.rbi} RBI</span>{/if}
                   {#if p.inningEnded}<span class="end">3. out, konec poloviny</span>{:else if p.outs}<span class="out">{p.outs === 1 ? `${p.outsAfter}. out` : `double play (${p.outsAfter}. out)`}</span>{/if}
                 </span>
@@ -74,6 +79,12 @@
           </li>
         {/each}
       </ol>
+      <footer class="sum" aria-label="Souhrn poloviny směny">
+        <span><strong>{sum.runs}</strong> {sum.runs === 1 ? 'run' : 'runs'}</span>
+        <span><strong>{sum.hits}</strong> {sum.hits === 1 ? 'hit' : 'hits'}</span>
+        <span><strong>{sum.errors}</strong> {sum.errors === 1 ? 'error' : 'errors'}</span>
+        {#if sum.lob !== null}<span><strong>{sum.lob}</strong> LOB</span>{/if}
+      </footer>
     </div>
   {/each}
 {/if}
@@ -161,6 +172,24 @@
   .desc .muted {
     font-size: 13px;
     margin-left: 4px;
+  }
+  .story {
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .sum {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding: 8px 14px 10px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .sum strong {
+    color: var(--ink);
+    font-weight: 800;
   }
   .extra {
     display: flex;

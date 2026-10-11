@@ -4,6 +4,7 @@
 // Pure functions (no Svelte) so they can be unit-tested.
 
 import type { PaResult } from './types.ts';
+import type { PlayDetail } from './narrate.ts';
 
 export interface LogGroup {
   id: string;
@@ -52,6 +53,8 @@ export interface PlayItem {
   stole: string[];
   runs: number;
   outs: number;
+  /** what happened in the play (recorded since migration 010), for the play-by-play */
+  detail: PlayDetail | null;
 }
 
 const num = (v: unknown) => Number(v ?? 0);
@@ -59,7 +62,7 @@ const num = (v: unknown) => Number(v ?? 0);
 /** Current (not deleted) plate appearances of the game, so that later edits show in the play log. */
 export type CurrentPas = Map<string, { result: PaResult; rbi: number; deleted: boolean }>;
 
-export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: CurrentPas): PlayItem[] {
+export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: CurrentPas, details?: Map<string, PlayDetail>): PlayItem[] {
   const byGroup = new Map<string, LogEntry[]>();
   for (const e of entries) {
     const list = byGroup.get(e.group_id);
@@ -82,7 +85,7 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
         id: g.id, kind: 'adjust', paId: null, edited: false, paDeleted: false,
         at: g.at, actor: g.actor_name, teamId: num(a.team_id), inning: num(a.inning),
         outsBefore: 0, outsAfter: 0, inningEnded: false, batter: null, batterTo: null, result: null, rbi: 0,
-        scored: delta > 0 ? [player] : [], removed: delta < 0 ? [player] : [], stole: [], runs: delta, outs: 0
+        scored: delta > 0 ? [player] : [], removed: delta < 0 ? [player] : [], stole: [], runs: delta, outs: 0, detail: null
       });
       continue;
     }
@@ -137,7 +140,8 @@ export function buildPlays(groups: LogGroup[], entries: LogEntry[], current?: Cu
       scored,
       stole,
       runs: scored.length,
-      outs: outsAfter - outsBefore
+      outs: outsAfter - outsBefore,
+      detail: details?.get(g.id) ?? null
     });
   }
   return plays.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));

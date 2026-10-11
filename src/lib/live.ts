@@ -3,6 +3,7 @@
 // The database (live_play) enforces the same rules; this only makes the UI helpful.
 
 import type { PaResult } from './types.ts';
+import type { FieldPos, PlayKind } from './narrate.ts';
 
 /** 0 = out, 1–3 = base, 4 = scored. */
 export type Dest = 0 | 1 | 2 | 3 | 4;
@@ -22,6 +23,10 @@ export interface Play {
   batterTo: Dest | null;
   runners: RunnerMove[];
   rbi: number;
+  /** how the ball was put in play (for the play-by-play; not part of the statistics) */
+  kind?: PlayKind | null;
+  /** where the ball went (optional, detailed scoring) */
+  location?: FieldPos | null;
 }
 
 /** Where a batter may end up with a given result (inclusive range). */
@@ -271,26 +276,41 @@ export function cascade<T extends Pick<Play, 'result' | 'batterTo' | 'runners'>>
 // ---------------------------------------------------------------------------------
 
 /** How the ball was put in play when the batting side made an out (or tried to). */
-export type FieldOut = 'fly' | 'ground' | 'fc' | 'dp' | 'bunt';
+export type FieldOut = PlayKind;
 
-export const FIELD_OUTS: { kind: FieldOut; label: string; hint: string }[] = [
+/** `detailed`: offered only in the detailed scoring (in the simple one "Fly out" covers them) */
+export const FIELD_OUTS: { kind: FieldOut; label: string; hint: string; detailed?: boolean }[] = [
   { kind: 'fly', label: 'Fly out', hint: 'Chycený fly, line drive nebo pop up. Běžci zůstávají; run po tag-upu = sacrifice fly.' },
+  { kind: 'line', label: 'Line out', hint: 'Chycený line drive. Běžec mimo metu může být doubled off.', detailed: true },
+  { kind: 'pop', label: 'Pop out', hint: 'Chycený pop up v infieldu.', detailed: true },
   { kind: 'ground', label: 'Ground out', hint: 'Out pálkaře na 1. metě, forced runners postoupí.' },
   { kind: 'fc', label: 'Fielder’s choice', hint: 'Out běžce (force out), pálkař je na metě.' },
   { kind: 'dp', label: 'Double play', hint: 'Out pálkaře i běžce v jedné akci. Bez RBI.' },
   { kind: 'bunt', label: 'Sacrifice bunt', hint: 'Pálkař out, běžci postoupí o metu.' }
 ];
 
-/** Field outs that make sense in this situation. */
-export function fieldOutsFor(bases: Bases, outs: number): FieldOut[] {
+const flyBall = (k: FieldOut) => k === 'fly' || k === 'line' || k === 'pop';
+
+/**
+ * Field outs that make sense in this situation. Without runners there is nothing to ask
+ * in the simple scoring; the detailed one still asks how the batter was out.
+ */
+export function fieldOutsFor(bases: Bases, outs: number, detailed = false): FieldOut[] {
   const on = occupied(bases).length;
-  if (!on) return [];
-  return FIELD_OUTS.map((f) => f.kind).filter((k) => (k === 'dp' ? outs < 2 : k === 'bunt' ? outs < 2 : true));
+  if (!on && !detailed) return [];
+  return FIELD_OUTS.filter((f) => detailed || !f.detailed)
+    .map((f) => f.kind)
+    .filter((k) => {
+      if (k === 'fc') return on > 0;
+      if (k === 'dp') return on > 0 && outs < 2;
+      if (k === 'bunt') return detailed || outs < 2;
+      return true;
+    });
 }
 
 /** Where the batter may end in a field out of this kind. */
 export function fieldOutBatterChoices(kind: FieldOut): Dest[] {
-  return kind === 'fly' ? [0] : [0, 1];
+  return flyBall(kind) ? [0] : [0, 1];
 }
 
 /**
@@ -304,7 +324,8 @@ export function fieldOutResult(kind: FieldOut, play: Pick<Play, 'batterTo' | 'ru
   const runnersOut = play.runners.filter((r) => r.to === 0).length;
   const advanced = play.runners.some((r) => r.to > r.from);
   if (play.batterTo !== null && play.batterTo > 0) return 'FC';
-  if (kind === 'fly' && runnersOut === 0 && outsBefore < 2 && runsOn(play) > 0) return 'SF';
+  // a caught fly ball or line drive with a run scoring after the catch
+  if ((kind === 'fly' || kind === 'line') && runnersOut === 0 && outsBefore < 2 && runsOn(play) > 0) return 'SF';
   if (kind === 'bunt' && runnersOut === 0 && outsBefore < 2 && advanced) return 'SH';
   return 'OUT';
 }
@@ -320,6 +341,8 @@ export function defaultFieldOut(kind: FieldOut, bases: Bases, outs: number): Pla
 
   switch (kind) {
     case 'fly':
+    case 'line':
+    case 'pop':
       break; // runners hold; a tag-up is set by the scorer
     case 'ground':
       for (const b of on) if (f.has(b)) moves.set(b, clamp(b + 1));
@@ -343,7 +366,7 @@ export function defaultFieldOut(kind: FieldOut, bases: Bases, outs: number): Pla
   if (outs + playOuts >= 3) runners = runners.map((r) => (r.to === 0 ? r : { ...r, to: r.from }));
 
   const base = { batterTo, runners };
-  const play: Play = { result: fieldOutResult(kind, base, outs), batterTo, runners, rbi: 0 };
+  const play: Play = { result: fieldOutResult(kind, base, outs), batterTo, runners, rbi: 0, kind };
   play.rbi = defaultRbi(play);
   return cascade(play);
 }

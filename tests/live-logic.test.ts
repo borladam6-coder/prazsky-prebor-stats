@@ -187,3 +187,15 @@ test('field out defaults are always valid', () => {
     }
   }
 });
+
+test('detailed scoring: every out asks how, line and pop outs behave like a fly', () => {
+  assert.deepEqual(fieldOutsFor([null, null, null], 0, true), ['fly', 'line', 'pop', 'ground', 'bunt']);
+  assert.deepEqual(fieldOutsFor(['x', null, null], 0, true), ['fly', 'line', 'pop', 'ground', 'fc', 'dp', 'bunt']);
+  const line = defaultFieldOut('line', [null, null, 'z'], 0);
+  assert.equal(line.kind, 'line');
+  assert.equal(fieldOutResult('line', { ...line, runners: [{ from: 3, to: 4 }] }, 0), 'SF');
+  assert.equal(fieldOutResult('pop', { ...line, runners: [{ from: 3, to: 4 }] }, 0), 'OUT', 'an infield pop is no sacrifice fly');
+  for (const k of ['fly', 'line', 'pop', 'ground', 'bunt'] as FieldOut[]) {
+    assert.equal(validatePlay(defaultFieldOut(k, [null, null, null], 1), [null, null, null], 1), null, k);
+  }
+});
