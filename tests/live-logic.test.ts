@@ -172,12 +172,12 @@ test('field outs: the official result follows from what happened', () => {
   const g = defaultFieldOut('ground', ['x', null, 'z'], 0);
   assert.deepEqual(dests(g), { 1: 2, 3: 3 });
   // what is offered
-  assert.deepEqual(fieldOutsFor([null, null, null], 0), []);
+  assert.deepEqual(fieldOutsFor([null, null, null], 0), ['fly', 'ground'], 'empty bases: fly ball or ground ball');
   assert.deepEqual(fieldOutsFor(['x', null, null], 2), ['fly', 'ground', 'fc']);
 });
 
 test('field out defaults are always valid', () => {
-  for (let m = 1; m < 8; m++) {
+  for (let m = 0; m < 8; m++) {
     const b: Bases = [m & 1 ? 'x' : null, m & 2 ? 'y' : null, m & 4 ? 'z' : null];
     for (const outs of [0, 1, 2]) {
       for (const k of fieldOutsFor(b, outs) as FieldOut[]) {

@@ -12,6 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 16: OUT s prázdnými metami se dělí na Fly out a Ground out (jedno klepnutí), ruční zápis zase jde u týmu, jehož živý zápis byl smazaný nebo nemá žádné akce.
 - Krok 15: živý zápis se po dni zápasu sám ukončí (každou noc, znovu otevřít ho pak může jen správce), oprava akcí přímo v detailu zápasu (záložka Průběh, např. hit → error, u akce je vidět „opraveno · původně 2B“), filtr zápasů Se zápisem / Jen výsledek, import ze softball.cz jednou za 3 dny.
 - Krok 14: průběh zápasu jako oficiální play-by-play anglicky („Skokan Sváťa grounds into a double play to shortstop. Pevný Pavel forced out at 2nd. Skokan Sváťa out at 1st.“), souhrn každé poloviny směny (runs, hits, errors, LOB), přepínač Podrobný zápis (kam šel míček, line out / pop out, vždy jde „Neuvádět“).
 - Krok 13: softballové termíny všude anglicky (double play, fly out, stolen base, runs, G/W/L/PCT v tabulce …), i v hláškách databáze.
@@ -27,7 +28,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
    - **Zapisovat celý zápas:** zadáš sestavu hostů, pak domácích, a dáš Začít zápas. Pálka se po 3 outech střídá (hosté ▲, domácí ▼).
    - **Zapisovat jen jeden tým:** vybereš tým a klikáš jeho pálkaře, pořadí se posouvá a soupeř se nepřepíná.
 2. Klepáním na hráče ze soupisky sestav pořadí pálkařů (nebo **Pořadí z minulého zápasu**), pořadí změníš přetažením za úchyt. Dej **Začít zápis**.
-3. U pálkaře na řadě klepni na výsledek (na telefonu jsou tlačítka dole, podržením tlačítka se ukáže celý název). Když jsou mety prázdné, uloží se hned. Když jsou na metách běžci, ukáže se, co se s nimi stalo. Výchozí návrh odpovídá běžnému průběhu, třeba singl posune jen vynucené běžce, takže 4 singly po sobě dají 1 bod. Stačí změnit, co bylo jinak, a dát **Uložit**.
+3. U pálkaře na řadě klepni na výsledek (na telefonu jsou tlačítka dole, podržením tlačítka se ukáže celý název). Když jsou mety prázdné, uloží se hned (u OUT se ještě vybere Fly out nebo Ground out, klepnutím se uloží). Když jsou na metách běžci, ukáže se, co se s nimi stalo. Výchozí návrh odpovídá běžnému průběhu, třeba singl posune jen vynucené běžce, takže 4 singly po sobě dají 1 bod. Stačí změnit, co bylo jinak, a dát **Uložit**.
 4. Klepnutím na běžce na diamantu zapíšeš ukradenou metu, postup bez odpalu nebo out běžce.
 5. **Zpět** vrátí poslední akci. **Pořadí a střídání** řeší náhradníky. V **Další možnosti** je Opravit stav (náhradní běžec, špatně zapsané outy), Ukončit zápis, Pohled diváka, Správa zápasu a nápověda.
 6. V režimu celého zápasu vrací Zpět poslední akci zápasu bez ohledu na tým.
@@ -36,7 +37,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Testovací zápas** (Zápasy → Vyzkoušet živý zápis, nebo odkaz v patičce): týmy Testovací Lvi a Testovací Orli po 12 vymyšlených hráčích, zápas je otevřený kdykoli. Je ve vlastní sezóně (id −1), takže se nepočítá do tabulky, žebříčků, statistik, hledání, „Právě se hraje“ ani do celkové historie změn, a import ze softball.cz na něj nesahá. Tlačítko Vynulovat (může kdokoli) smaže vše zapsané a zápis začne znovu.
 
-**Outy:** tlačítka 1B, 2B, 3B, HR, BB, HBP, K, OUT, ROE. OUT s prázdnými metami se uloží hned. S běžci na metách se web zeptá, jak k outu došlo: Fly out (běžci zůstávají; run po tag-upu při méně než 2 outech = SF s RBI), Ground out (out pálkaře, forced runners postoupí), Fielder’s choice (out běžce, pálkař na metě), Double play (bez RBI), Sacrifice bunt (= SH). Oficiální výsledek se ukáže („Zapíše se: SF – Sacrifice fly“) a mění se podle toho, co nastavíš u běžců.
+**Outy:** tlačítka 1B, 2B, 3B, HR, BB, HBP, K, OUT, ROE. OUT s prázdnými metami: dvě velká tlačítka Fly out (chycený míč) a Ground out (míč po zemi, pálkař vyautován na 1. metě), klepnutí out rovnou uloží. S běžci na metách se web zeptá, jak k outu došlo: Fly out (běžci zůstávají; run po tag-upu při méně než 2 outech = SF s RBI), Ground out (out pálkaře, forced runners postoupí), Fielder’s choice (out běžce, pálkař na metě), Double play (bez RBI), Sacrifice bunt (= SH). Oficiální výsledek se ukáže („Zapíše se: SF – Sacrifice fly“) a mění se podle toho, co nastavíš u běžců.
 
 **Průběh zápasu (play-by-play):** každá nová akce se popíše větou jako v oficiálním zápisu: „singles to left field“, „reaches on an error by the shortstop“, „forced out at 2nd“, „doubled off 1st“, „out at 3rd after tagging up“, „steals 2nd“, „caught stealing 2nd“. Pod každou polovinou směny je souhrn runs, hits, errors (ROE) a LOB (běžci, kteří zůstali na metách po 3. outu). Akce zapsané před krokem 14 zůstávají v krátké podobě.
 
@@ -56,7 +57,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 **Správce** (dole v detailu zápasu → Správa zápasu, odemyká se kódem správce): ruční konečné skóre (import ho nepřepíše) a smazání celého záznamu zápasu. Změny správce může vrátit jen správce. V databázi je jen bcrypt hash kódu (`private.settings.admin_code_hash`). Kód jde změnit přímo na webu. Při zapomenutí ho nastaví nový hash v SQL Editoru: `update private.settings set admin_code_hash = extensions.crypt('NOVYKOD', extensions.gen_salt('bf', 8));` (kód bez pomlček, velkými písmeny, aspoň 4 znaky).
 
-Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny. Tým, který má v zápase živý zápis, nejde zapisovat ručně (web i databáze to odmítnou), opravuje se v průběhu zápasu. Ruční zápis zůstává pro týmy bez živého zápisu.
+Statistiky z živého zápisu jdou do stejných tabulek jako ruční zápis. Box score a sezónní statistiky jsou tedy pořád jen jedny. Tým, který má v zápase živý zápis, nejde zapisovat ručně (web i databáze to odmítnou), opravuje se v průběhu zápasu. Ruční zápis zůstává pro týmy bez živého zápisu. Ukončený živý zápis bez jediné akce (po Smazat celý záznam zápasu nebo po smazání všech akcí) se nepočítá, tým jde zase zapsat ručně.
 
 ## Struktura
 
@@ -65,6 +66,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/012_manual_after_reset.sql  ruční zápis znovu povolený, když živý zápis týmu nemá žádné akce
 supabase/migrations/011_autofinish.sql  automatické ukončení živého zápisu po dni zápasu, znovuotevření jen správcem
 supabase/migrations/010_play_details.sql  podrobnosti akcí pro play-by-play (druh, místo, běžci)
 supabase/migrations/009_english_terms.sql  softballové termíny v hláškách anglicky
@@ -90,7 +92,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql`, `010_play_details.sql` a `011_autofinish.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql`, `010_play_details.sql`, `011_autofinish.sql` a `012_manual_after_reset.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

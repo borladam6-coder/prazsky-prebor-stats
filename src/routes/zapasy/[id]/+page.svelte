@@ -142,8 +142,16 @@
 
   // ------------------------------------------------------------ entry
   const entryTeam = $derived(league.team(entryTeamId));
-  /** a team scored live is corrected in its play-by-play, not here (the database refuses it too) */
-  const entryLocked = $derived(live.some((s) => s.team_id === entryTeamId));
+  /**
+   * A team scored live is corrected in its play-by-play, not here (the database refuses it
+   * too). A finished live scoring without any play (wiped, or every play taken back) does
+   * not count: the team is entered by hand again (migration 012).
+   */
+  const entryLocked = $derived(
+    live.some(
+      (s) => s.team_id === entryTeamId && (!s.finished || plays.some((p) => p.kind === 'play' && p.teamId === s.team_id))
+    )
+  );
 
   const entryPlayers = $derived.by(() => {
     if (!entryTeamId) return [];

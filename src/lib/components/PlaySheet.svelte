@@ -11,7 +11,7 @@
   import { outsWord, plural } from '../format.ts';
   import {
     applyPlay, batterChoices, cascade, defaultFieldOut, defaultPlay, defaultRbi, destLabel, fieldOutBatterChoices,
-    fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay,
+    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay,
     type Base, type Bases, type Dest, type FieldOut, type Play
   } from '../live.ts';
   import type { PaResult } from '../types.ts';
@@ -71,14 +71,18 @@
   let rbiTouched = $state(false);
 
   /** an out in the field with runners on base: first say how it happened */
-  const fieldMode = untrack(() => result === 'OUT' && (occupied(bases).length > 0 || detailed));
+  const fieldMode = untrack(() => result === 'OUT');
   let kind = $state<FieldOut | null>(null);
   const kinds = untrack(() => fieldOutsFor(bases, outs, detailed));
+
+  /** simple scoring with empty bases: the kind is all there is to say, one tap saves */
+  const oneTap = untrack(() => fieldMode && !detailed && occupied(bases).length === 0);
 
   function chooseKind(k: FieldOut) {
     kind = k;
     play = { ...defaultFieldOut(k, bases, outs), location: play.location ?? null };
     rbiTouched = false;
+    if (oneTap && !busy && !validatePlay(play, bases, outs)) onconfirm($state.snapshot(play) as Play);
   }
 
   /** where the ball went: only for balls in play, only in the detailed scoring, never required */
@@ -140,7 +144,7 @@
   const name = (id: string | null | undefined) => league.player(id)?.name ?? '?';
   const title = $derived.by(() => {
     if (!result) return 'Pohyb běžců';
-    if (fieldMode) return kind ? `Out v poli · ${FIELD_OUTS.find((f) => f.kind === kind)?.label}` : 'Out v poli';
+    if (fieldMode) return kind ? `Out v poli · ${fieldOutLabel(kind, bases).label}` : 'Out v poli';
     const label = resultDef(result)?.label ?? result;
     return label.toUpperCase() === result ? label : `${result} – ${label}`;
   });
@@ -174,12 +178,13 @@
   {/if}
 
   {#if fieldMode}
-    {#if !kind}<p class="ask muted">Jak k outu došlo? Podle toho se předvyplní běžci a výsledek se zapíše sám.</p>{/if}
-    <div class="kinds" class:compact={!!kind} role="group" aria-label="Druh outu">
+    {#if !kind}<p class="ask muted">{oneTap ? 'Jak byl pálkař vyautován? Klepnutím se out uloží.' : 'Jak k outu došlo? Podle toho se předvyplní běžci a výsledek se zapíše sám.'}</p>{/if}
+    <div class="kinds" class:compact={!!kind} class:big={oneTap} role="group" aria-label="Druh outu">
       {#each FIELD_OUTS.filter((f) => kinds.includes(f.kind)) as f (f.kind)}
-        <button type="button" class="kind" aria-pressed={kind === f.kind} onclick={() => chooseKind(f.kind)}>
-          <strong>{f.label}</strong>
-          {#if !kind}<span>{f.hint}</span>{/if}
+        {@const l = fieldOutLabel(f.kind, bases)}
+        <button type="button" class="kind" aria-pressed={kind === f.kind} disabled={oneTap && busy} onclick={() => chooseKind(f.kind)}>
+          <strong>{l.label}</strong>
+          {#if !kind}<span>{l.hint}</span>{/if}
         </button>
       {/each}
     </div>
@@ -254,7 +259,9 @@
 
   <div class="actions">
     <button type="button" class="btn btn-quiet" onclick={oncancel}>Zrušit</button>
-    <button type="submit" class="btn btn-primary" disabled={!!error || busy || (fieldMode && !kind)}><Icon name="check" size={18} /> Uložit</button>
+    {#if !oneTap}
+      <button type="submit" class="btn btn-primary" disabled={!!error || busy || (fieldMode && !kind)}><Icon name="check" size={18} /> Uložit</button>
+    {/if}
   </div>
 </form>
 </div>
@@ -371,6 +378,18 @@
   }
   .kind strong {
     font-size: 16px;
+  }
+  /* one tap saves: two big buttons side by side */
+  .kinds.big {
+    grid-template-columns: 1fr 1fr;
+  }
+  .kinds.big .kind {
+    min-height: 96px;
+    align-content: center;
+    padding: 16px;
+  }
+  .kinds.big .kind strong {
+    font-size: 20px;
   }
   .kinds.compact {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
