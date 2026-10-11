@@ -35,6 +35,8 @@ class League {
   test = $state<{ teams: Team[]; players: Player[]; games: Game[] }>({ teams: [], players: [], games: [] });
   /** game id → number of teams (0–2) with recorded batting stats */
   recorded = $state<Map<number, number>>(new Map());
+  /** game id → team id → runs in our box score */
+  recordedRuns = $state<Map<number, Map<number, number>>>(new Map());
   status = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
   error = $state<string | null>(null);
 
@@ -193,12 +195,18 @@ class League {
     if (!this.season) return;
     const { data, error } = await supabase!
       .from('team_game_batting')
-      .select('game_id, team_id')
+      .select('game_id, team_id, r')
       .eq('season_id', this.season.id);
     if (error) throw error;
     const m = new Map<number, number>();
-    for (const r of data ?? []) m.set(r.game_id, (m.get(r.game_id) ?? 0) + 1);
+    const runs = new Map<number, Map<number, number>>();
+    for (const r of data ?? []) {
+      m.set(r.game_id, (m.get(r.game_id) ?? 0) + 1);
+      if (!runs.has(r.game_id)) runs.set(r.game_id, new Map());
+      runs.get(r.game_id)!.set(r.team_id, Number(r.r));
+    }
     this.recorded = m;
+    this.recordedRuns = runs;
   }
 
   /** Replaces or adds one player after a write (keeps the list sorted by name). */
@@ -223,6 +231,23 @@ class League {
 
   teamPlayers(teamId: number, includeInactive = false) {
     return [...this.players, ...this.test.players].filter((p) => p.team_id === teamId && (includeInactive || p.active));
+  }
+
+  /**
+   * Teams whose runs in our box score differ from the result reported to softball.cz
+   * (a forgotten run in the scoring, usually). Only a hint, nothing is changed.
+   */
+  scoreMismatch(g: Game, runs?: Map<number, number>): { teamId: number; ours: number; official: number }[] {
+    const [home, away] = g.score_override && g.imported_score ? g.imported_score : [g.home_score, g.away_score];
+    if (g.status !== 'played' || home == null || away == null) return [];
+    const ours = runs ?? this.recordedRuns.get(g.id);
+    if (!ours) return [];
+    return [
+      { teamId: g.home_team_id, official: home },
+      { teamId: g.away_team_id, official: away }
+    ]
+      .filter((x) => ours.has(x.teamId) && ours.get(x.teamId) !== x.official)
+      .map((x) => ({ ...x, ours: ours.get(x.teamId)! }));
   }
 
   /** A game can receive statistics once it has been played (or its start time has passed). */

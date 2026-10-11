@@ -1,13 +1,18 @@
 <script lang="ts">
   // "What happened to the runners?" Prefilled with the usual outcome; one tap per change.
+  // Only destinations that are possible are offered (nobody ends behind a runner who was
+  // behind him), and moving a runner up pushes the runners ahead of him.
+  // An out in the field first asks how it happened (fly, ground, double play, bunt …);
+  // the official result (OUT, SF, SH, FC) and the RBI follow from that automatically.
   import { untrack } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { league } from '../league.svelte.ts';
   import { resultDef } from '../stats.ts';
   import { outsWord, plural } from '../format.ts';
   import {
-    applyPlay, batterChoices, defaultPlay, defaultRbi, destLabel, occupied, outsOn, runnerChoices, runsOn, validatePlay,
-    type Base, type Bases, type Dest, type Play
+    applyPlay, batterChoices, cascade, defaultFieldOut, defaultPlay, defaultRbi, destLabel, fieldOutBatterChoices,
+    fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay,
+    type Base, type Bases, type Dest, type FieldOut, type Play
   } from '../live.ts';
   import type { PaResult } from '../types.ts';
   import Icon from './Icon.svelte';
@@ -61,20 +66,41 @@
   let play = $state<Play>(untrack(initial));
   let rbiTouched = $state(false);
 
+  /** an out in the field with runners on base: first say how it happened */
+  const fieldMode = untrack(() => result === 'OUT' && occupied(bases).length > 0);
+  let kind = $state<FieldOut | null>(null);
+  const kinds = untrack(() => fieldOutsFor(bases, outs));
+
+  function chooseKind(k: FieldOut) {
+    kind = k;
+    play = defaultFieldOut(k, bases, outs);
+    rbiTouched = false;
+  }
+
+  /** after any change: push runners ahead, recompute the official result and the RBI */
+  function settle(next: Play) {
+    let p = cascade(next);
+    if (fieldMode && kind) p = { ...p, result: fieldOutResult(kind, p, outs) };
+    play = p;
+    syncRbi();
+  }
+
   const batter = $derived(league.player(lineup[nextSlot]));
   const error = $derived(validatePlay(play, bases, outs));
   const runs = $derived(runsOn(play));
   const after = $derived(applyPlay({ inning, outs, bases, nextSlot }, lineup, play));
 
   function setRunner(from: Base, to: Dest) {
-    play.runners = play.runners.map((r) => {
-      if (r.from !== from) return r;
-      // a stolen base needs a runner-only play and an advance; the tapped runner gets SB by default
-      const advancing = !play.result && to > from;
-      const sb = advancing && (!!r.sb || (r.from === runnerFrom && !(r.to > r.from)));
-      return { ...r, to, sb };
+    settle({
+      ...play,
+      runners: play.runners.map((r) => {
+        if (r.from !== from) return r;
+        // a stolen base needs a runner-only play and an advance; the tapped runner gets SB by default
+        const advancing = !play.result && to > from;
+        const sb = advancing && (!!r.sb || (r.from === runnerFrom && !(r.to > r.from)));
+        return { ...r, to, sb };
+      })
     });
-    syncRbi();
   }
 
   function toggleSb(from: Base) {
@@ -82,8 +108,7 @@
   }
 
   function setBatter(to: Dest) {
-    play.batterTo = to;
-    syncRbi();
+    settle({ ...play, batterTo: to });
   }
 
   function syncRbi() {
@@ -92,7 +117,7 @@
 
   function changeRbi(delta: number) {
     rbiTouched = true;
-    play.rbi = Math.max(0, Math.min(4, play.rbi + delta));
+    play.rbi = Math.max(0, Math.min(4, runs, play.rbi + delta));
   }
 
   function basesText(b: (string | null)[]) {
@@ -105,13 +130,16 @@
   const name = (id: string | null | undefined) => league.player(id)?.name ?? '?';
   const title = $derived.by(() => {
     if (!result) return 'Pohyb běžců';
+    if (fieldMode) return kind ? `Out v poli · ${FIELD_OUTS.find((f) => f.kind === kind)?.label}` : 'Out v poli';
     const label = resultDef(result)?.label ?? result;
     return label.toUpperCase() === result ? label : `${result} – ${label}`;
   });
+  const recorded = $derived(play.result ? `${play.result} – ${resultDef(play.result)?.label ?? ''}` : null);
+  const batterOptions = $derived(fieldMode && kind ? fieldOutBatterChoices(kind) : result ? batterChoices(result) : []);
 
   function submit(e: SubmitEvent) {
     e.preventDefault();
-    if (!error && !busy) onconfirm($state.snapshot(play) as Play);
+    if (!error && !busy && (!fieldMode || kind)) onconfirm($state.snapshot(play) as Play);
   }
 </script>
 
@@ -123,14 +151,30 @@
     <button type="button" class="x" aria-label="Zavřít" onclick={oncancel}><Icon name="close" size={20} /></button>
   </header>
 
-  <p class="ask muted">Co se stalo{result ? ' s pálkařem a běžci' : ' s běžci'}? Předvyplněno podle běžného průběhu.</p>
+  {#if fieldMode}
+    {#if !kind}<p class="ask muted">Jak k outu došlo? Podle toho se předvyplní běžci a výsledek se zapíše sám.</p>{/if}
+    <div class="kinds" class:compact={!!kind} role="group" aria-label="Druh outu">
+      {#each FIELD_OUTS.filter((f) => kinds.includes(f.kind)) as f (f.kind)}
+        <button type="button" class="kind" aria-pressed={kind === f.kind} onclick={() => chooseKind(f.kind)}>
+          <strong>{f.label}</strong>
+          {#if !kind}<span>{f.hint}</span>{/if}
+        </button>
+      {/each}
+    </div>
+  {:else}
+    <p class="ask muted">Co se stalo{result ? ' s pálkařem a běžci' : ' s běžci'}? Nabízí se jen to, co je možné.</p>
+  {/if}
 
+  {#if !fieldMode || kind}
+  {#if fieldMode && recorded}
+    <p class="derived">Zapíše se: <strong>{recorded}</strong></p>
+  {/if}
   <div class="rows">
     {#if result && play.batterTo !== null}
       <fieldset class="row">
         <legend><span class="tag">Pálkař</span> {name(batter?.id)}</legend>
         <div class="choices">
-          {#each batterChoices(result) as d (d)}
+          {#each batterOptions as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={play.batterTo === d} onclick={() => setBatter(d)}>
               {d === 0 ? 'Out' : d === 4 ? 'Doběhl' : `${d}. meta`}
             </button>
@@ -143,7 +187,7 @@
       <fieldset class="row">
         <legend><span class="tag">z {r.from}.</span> {name(bases[r.from - 1])}</legend>
         <div class="choices">
-          {#each runnerChoices(r.from) as d (d)}
+          {#each runnerOptions(r.from, play) as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={r.to === d} onclick={() => setRunner(r.from, d)}>
               {destLabel(d, r.from)}
             </button>
@@ -170,6 +214,7 @@
     {/if}
   </div>
 
+  {#if !fieldMode || kind}
   <p class="preview" aria-live="polite">
     {#if runs}<span class="pill pos">+{runs} {plural(runs, ['bod', 'body', 'bodů'])}</span>{/if}
     {#if outsOn(play)}<span class="pill neg">{outsWord(outsOn(play))}</span>{/if}
@@ -179,12 +224,15 @@
       <span class="muted">Potom: {outsWord(after.outs)}, {basesText(after.bases)}.</span>
     {/if}
   </p>
+  {/if}
 
-  {#if error}<p class="err" role="alert">{error}</p>{/if}
+  {/if}
+
+  {#if error && (!fieldMode || kind)}<p class="err" role="alert">{error}</p>{/if}
 
   <div class="actions">
     <button type="button" class="btn btn-quiet" onclick={oncancel}>Zrušit</button>
-    <button type="submit" class="btn btn-primary" disabled={!!error || busy}><Icon name="check" size={18} /> Uložit</button>
+    <button type="submit" class="btn btn-primary" disabled={!!error || busy || (fieldMode && !kind)}><Icon name="check" size={18} /> Uložit</button>
   </div>
 </form>
 </div>
@@ -242,6 +290,58 @@
   }
   .ask {
     margin: 6px 0 14px;
+    font-size: 14px;
+  }
+  .kinds {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  @media (min-width: 520px) {
+    .kinds {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .kind {
+    display: grid;
+    gap: 2px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 140ms, background-color 140ms;
+  }
+  .kind strong {
+    font-size: 16px;
+  }
+  .kinds.compact {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 6px;
+  }
+  .kinds.compact .kind {
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .kinds.compact .kind strong {
+    font-size: 13.5px;
+  }
+  .kind span {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .kind[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .derived {
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: var(--surface-2);
     font-size: 14px;
   }
   .rows {

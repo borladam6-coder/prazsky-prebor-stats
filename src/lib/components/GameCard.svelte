@@ -17,6 +17,7 @@
   const homeWon = $derived(played && game.home_score! > game.away_score!);
   const awayWon = $derived(played && game.away_score! > game.home_score!);
   const playable = $derived(league.isPlayable(game));
+  const mismatch = $derived(league.scoreMismatch(game).length > 0);
 
   const outcome = $derived.by(() => {
     if (!played || focusTeam === null) return null;
@@ -40,6 +41,8 @@
       <span class="date">{day(game.starts_at)}</span>
       {#if outcome}
         <span class="pill {outcome === 'Výhra' ? 'pos' : outcome === 'Prohra' ? 'neg' : 'neutral'}">{outcome}</span>
+      {:else if mismatch}
+        <span class="pill warn" title="Doběhy v zápisu nesedí s výsledkem nahlášeným svazu">Skóre nesedí</span>
       {:else if recorded >= 2}
         <span class="pill pos">Zapsáno</span>
       {:else if recorded === 1}

@@ -1,8 +1,9 @@
 <script lang="ts">
   // Result buttons of the live scoring: big codes only. Holding a button shows its full
   // name (a long press does not record anything); on a computer the name is a tooltip.
+  // SF, SH and FC have no button: "OUT" asks how the out happened and they follow from it.
   import { fade } from 'svelte/transition';
-  import { RESULTS } from '../stats.ts';
+  import { resultDef } from '../stats.ts';
   import type { PaResult } from '../types.ts';
 
   let {
@@ -14,6 +15,13 @@
     allowed: (code: PaResult) => boolean;
     onpick: (code: PaResult) => void;
   } = $props();
+
+  const PAD: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT', 'ROE'];
+  const LABELS: Partial<Record<PaResult, string>> = {
+    OUT: 'Out v poli: do vzduchu, po zemi, dvojitý, bunt',
+    ROE: 'Reached on error: na metě díky chybě obrany'
+  };
+  const buttons = PAD.map((code) => ({ code, label: LABELS[code] ?? resultDef(code)?.label ?? code, group: resultDef(code)?.group ?? 'out' }));
 
   let tip = $state<PaResult | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -47,7 +55,7 @@
 </script>
 
 <div class="pad" role="group" aria-label="Výsledek na pálce">
-  {#each RESULTS as r (r.code)}
+  {#each buttons as r (r.code)}
     <button
       type="button"
       class="res g-{r.group}"
@@ -72,7 +80,7 @@
 <style>
   .pad {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 7px;
   }
   .res {
@@ -139,16 +147,18 @@
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0;
-    white-space: nowrap;
+    width: max-content;
+    max-width: 210px;
+    white-space: normal;
     pointer-events: none;
     box-shadow: var(--shadow);
   }
   /* edge columns: keep the name on screen */
-  .res:nth-child(4n + 1) .tip {
+  .res:nth-child(3n + 1) .tip {
     left: 0;
     transform: none;
   }
-  .res:nth-child(4n) .tip {
+  .res:nth-child(3n) .tip {
     left: auto;
     right: 0;
     transform: none;
