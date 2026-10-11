@@ -446,7 +446,7 @@
     if (!session || busy) return;
     toasts.list = [];
     // nobody on base: nothing to ask, the usual outcome is saved right away (Zpět takes it back)
-    if (occupiedCount === 0 && !(detailed && BALL_IN_PLAY.includes(code))) submit(defaultPlay(code, bases, session.outs));
+    if (occupiedCount === 0 && code !== 'OUT' && !(detailed && BALL_IN_PLAY.includes(code))) submit(defaultPlay(code, bases, session.outs));
     else sheet = { result: code, runnerFrom: null };
   }
 

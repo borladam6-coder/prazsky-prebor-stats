@@ -283,7 +283,7 @@ export const FIELD_OUTS: { kind: FieldOut; label: string; hint: string; detailed
   { kind: 'fly', label: 'Fly out', hint: 'Chycený fly, line drive nebo pop up. Běžci zůstávají; run po tag-upu = sacrifice fly.' },
   { kind: 'line', label: 'Line out', hint: 'Chycený line drive. Běžec mimo metu může být doubled off.', detailed: true },
   { kind: 'pop', label: 'Pop out', hint: 'Chycený pop up v infieldu.', detailed: true },
-  { kind: 'ground', label: 'Ground out', hint: 'Out pálkaře na 1. metě, forced runners postoupí.' },
+  { kind: 'ground', label: 'Ground out', hint: 'Míč po zemi, pálkař out na 1. metě (force out), forced runners postoupí.' },
   { kind: 'fc', label: 'Fielder’s choice', hint: 'Out běžce (force out), pálkař je na metě.' },
   { kind: 'dp', label: 'Double play', hint: 'Out pálkaře i běžce v jedné akci. Bez RBI.' },
   { kind: 'bunt', label: 'Sacrifice bunt', hint: 'Pálkař out, běžci postoupí o metu.' }
@@ -292,12 +292,12 @@ export const FIELD_OUTS: { kind: FieldOut; label: string; hint: string; detailed
 const flyBall = (k: FieldOut) => k === 'fly' || k === 'line' || k === 'pop';
 
 /**
- * Field outs that make sense in this situation. Without runners there is nothing to ask
- * in the simple scoring; the detailed one still asks how the batter was out.
+ * Field outs that make sense in this situation. Without runners the simple scoring asks
+ * only fly ball or ground ball (one tap saves it); the detailed one offers every kind.
  */
 export function fieldOutsFor(bases: Bases, outs: number, detailed = false): FieldOut[] {
   const on = occupied(bases).length;
-  if (!on && !detailed) return [];
+  if (!on && !detailed) return ['fly', 'ground'];
   return FIELD_OUTS.filter((f) => detailed || !f.detailed)
     .map((f) => f.kind)
     .filter((k) => {
@@ -306,6 +306,16 @@ export function fieldOutsFor(bases: Bases, outs: number, detailed = false): Fiel
       if (k === 'bunt') return detailed || outs < 2;
       return true;
     });
+}
+
+/** Button label: without runners a bunt is no sacrifice, just a bunt out. */
+export function fieldOutLabel(kind: FieldOut, bases: Bases): { label: string; hint: string } {
+  const f = FIELD_OUTS.find((x) => x.kind === kind)!;
+  if (kind === 'bunt' && occupied(bases).length === 0) return { label: 'Bunt out', hint: 'Pálkař out po buntu.' };
+  if (occupied(bases).length === 0 && (kind === 'fly' || kind === 'ground')) {
+    return { label: f.label, hint: kind === 'fly' ? 'Chycený míč ze vzduchu.' : 'Míč po zemi, pálkař vyautován na 1. metě.' };
+  }
+  return { label: f.label, hint: f.hint };
 }
 
 /** Where the batter may end in a field out of this kind. */

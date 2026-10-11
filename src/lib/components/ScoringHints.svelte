@@ -12,7 +12,7 @@
       target: 'pad',
       at: 'top',
       title: 'Výsledek pálkaře',
-      text: 'Klepni na výsledek. Když nikdo není na metě, uloží se hned. Jinak se zeptám, kam se dostali běžci. Podržením tlačítka uvidíš celý název.'
+      text: 'Klepni na výsledek. Když nikdo není na metě, uloží se hned (u OUT jen vybereš Fly out nebo Ground out). Jinak se zeptám, kam se dostali běžci. Podržením tlačítka uvidíš celý název.'
     },
     {
       target: 'field',

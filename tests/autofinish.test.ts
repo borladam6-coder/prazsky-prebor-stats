@@ -40,7 +40,7 @@ before(async () => {
   c = t.newCaller('Zapisovatel');
   const games = await t.q(`select * from games where status = 'played' and id > 0 order by starts_at limit 2`);
   [past, today] = games;
-  await t.q(`update games set starts_at = now() - interval '1 hour' where id = $1`, [today.id]);
+  await t.q(`update games set starts_at = now() where id = $1`, [today.id]);
   order = async (team) => (await t.q(`select id from players where team_id = $1 and active order by name limit 9`, [team])).map((p) => p.id);
   await t.rpc(c, 'live_start', { p_game_id: past.id, p_team_id: past.away_team_id, p_lineup: await order(past.away_team_id) });
   await t.rpc(c, 'live_start', { p_game_id: today.id, p_team_id: today.home_team_id, p_lineup: await order(today.home_team_id) });
@@ -109,4 +109,24 @@ test('on the game day anybody ends and continues', async () => {
 
 test('the scheduled call is for the server only', async () => {
   await expectError(t.as('anon', `select public.live_autofinish()`), /permission denied/);
+});
+
+test('manual entry opens again once the live scoring has no plays (migration 012)', async () => {
+  // today's game: scoring runs without plays → locked; ended without plays → free
+  const team = today.home_team_id;
+  const [player] = await order(team);
+  const add = () => t.rpc(c, 'add_plate_appearance', { p_game_id: today.id, p_player_id: player, p_result: '1B' });
+  await expectError(add(), /živý zápis/);
+  const s = await session(today.id, team);
+  await t.rpc(c, 'live_finish', { p_game_id: today.id, p_team_id: team, p_expected_version: s.version, p_finished: true });
+  await add();
+
+  // the past game has plays → locked; after the administrator wiped the game → free
+  const pastTeam = past.away_team_id;
+  const [batter] = await order(pastTeam);
+  const addPast = () => t.rpc(c, 'add_plate_appearance', { p_game_id: past.id, p_player_id: batter, p_result: '2B' });
+  await expectError(addPast(), /živý zápis/);
+  await t.rpc(c, 'admin_reset_game', { p_game_id: past.id, p_code: CODE });
+  await addPast();
+  assert.deepEqual(await t.as('anon', CONSISTENCY), []);
 });
