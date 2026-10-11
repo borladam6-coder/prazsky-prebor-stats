@@ -52,6 +52,9 @@ test('outs in the field: double play, fielder\'s choice, sacrifices', () => {
   assert.equal(say({ result: 'OUT', batterTo: 0 }), 'Lehký Lukáš is out.', 'quick out without details');
   // an edited result drops the recorded kind
   assert.equal(say({ result: 'OUT', kind: 'fly', batterTo: 0 }, 'K'), 'Lehký Lukáš strikes out.');
+  // a hit corrected to an error: the fielder who erred is not known
+  assert.equal(say({ result: '1B', location: 'LF', batterTo: 1 }, 'ROE'), 'Lehký Lukáš reaches on an error.');
+  assert.equal(say({ result: 'ROE', location: 'SS', batterTo: 1 }), 'Lehký Lukáš reaches on an error by the shortstop.');
 });
 
 test('runner-only plays', () => {

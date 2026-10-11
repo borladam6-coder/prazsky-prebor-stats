@@ -436,4 +436,8 @@ export const adminSetScore = (gameId: number, home: number | null, away: number 
 
 export const adminRevertGroup = (groupId: string) => adminCall<string>('admin_revert_group', { p_group_id: groupId });
 
+/** Reopens finished live scoring after the game day (only the administrator may). */
+export const adminLiveReopen = (gameId: number, teamId: number) =>
+  adminCall<LiveSession>('admin_live_reopen', { p_game_id: gameId, p_team_id: teamId });
+
 export const adminChangeCode = (newCode: string) => adminCall<boolean>('admin_change_code', { p_new_code: newCode });

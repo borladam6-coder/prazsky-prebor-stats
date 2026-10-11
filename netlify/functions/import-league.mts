@@ -1,6 +1,7 @@
 // Scheduled import: softball.cz → Supabase.
 //
-// Runs every 6 hours (cron below is UTC). Can also be started manually:
+// Runs every third day at night (cron below is UTC; 02:07 UTC on days 1, 4, 7 … of
+// the month). Can also be started manually:
 // Netlify → Logs & metrics → Functions → import-league → "Run now".
 //
 // Required environment variables (Netlify → Site configuration → Environment variables):
@@ -82,5 +83,5 @@ export default async (): Promise<Response> => {
 };
 
 export const config: Config = {
-  schedule: '7 */6 * * *'
+  schedule: '7 2 */3 * *'
 };

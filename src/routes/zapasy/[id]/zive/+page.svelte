@@ -9,8 +9,9 @@
   import {
     liveOfGame, gameEntries, liveStart, liveSetLineup, liveSetState, liveFinish, liveUndo,
     gamePlayLog, liveDeletePlay, liveDeleteFrom, liveRewind, liveAdjustRuns, updatePlateAppearance, revertGroup,
-    errorMessage, isNetworkError, WriteCancelled, testReset
+    errorMessage, isNetworkError, WriteCancelled, testReset, adminLiveReopen
   } from '#lib/api.ts';
+  import { admin } from '#lib/admin.svelte.ts';
   import { PlayQueue } from '#lib/queue.svelte.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
   import { defaultPlay, runsOn, type Base, type Bases, type Play } from '#lib/live.ts';
@@ -30,7 +31,7 @@
   import ResultPad from '#lib/components/ResultPad.svelte';
   import ScoringHints from '#lib/components/ScoringHints.svelte';
   import TestBanner from '#lib/components/TestBanner.svelte';
-  import { isTestGame } from '#lib/testgame.ts';
+  import { isTestGame, gameDayOver } from '#lib/testgame.ts';
   import Icon from '#lib/components/Icon.svelte';
 
   const id = $derived(Number(page.params.id));
@@ -369,9 +370,13 @@
     }
   }
 
+  /** after the game day a finished scoring reopens only with the administrator's code */
+  const dayOver = $derived(gameDayOver(game));
+  const reopenAs = (s: LiveSession) => (dayOver ? adminLiveReopen(s.game_id, s.team_id) : liveFinish(s, false));
+
   const reopenGame = () =>
     run(async () => {
-      for (const s of sessions.filter((x) => x.finished)) await liveFinish(s, false);
+      for (const s of sessions.filter((x) => x.finished)) await reopenAs(s);
     }, () => (lastPlay = 'Pokračuješ v zápisu zápasu.'));
 
   async function run<T>(action: () => Promise<T>, done?: (r: T) => void): Promise<boolean> {
@@ -509,7 +514,7 @@
     run(async () => {
       // with both teams scored here, ending the game ends both sessions
       const targets = finished && fullGame ? [awayS!, homeS!] : [session!];
-      for (const t of targets) await liveFinish(t, finished);
+      for (const t of targets) await (finished ? liveFinish(t, true) : reopenAs(t));
     }, () => {
       confirmFinish = false;
       toasts.show(finished ? 'Živý zápis ukončen. Statistiky zůstávají v box score.' : 'Pokračuješ v zápisu.');
@@ -716,12 +721,22 @@
       <div class="card done" in:fade={{ duration: 150 }}>
         <Icon name="flag" size={28} />
         <h2>Živý zápis zápasu je ukončený</h2>
-        <p class="muted">Všechny zápisy jsou v box score zápasu. Pokud se ještě hraje, můžeš pokračovat.</p>
-        <div class="row">
-          <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
-          <button type="button" class="btn" disabled={busy} onclick={() => (gameRestart = true)}>Začít znovu</button>
-          <button type="button" class="btn btn-primary" disabled={busy} onclick={reopenGame}>Pokračovat v zápisu</button>
-        </div>
+        {#if dayOver}
+          <p class="muted">Zápas už proběhl. Opravit jednotlivé akce jde dál tužkou v průběhu zápasu, znovu otevřít zápis může jen správce.</p>
+          <div class="row">
+            <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
+            {#if admin.unlocked}
+              <button type="button" class="btn btn-primary" disabled={busy} onclick={reopenGame}>Otevřít znovu (správce)</button>
+            {/if}
+          </div>
+        {:else}
+          <p class="muted">Všechny zápisy jsou v box score zápasu. Pokud se ještě hraje, můžeš pokračovat.</p>
+          <div class="row">
+            <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
+            <button type="button" class="btn" disabled={busy} onclick={() => (gameRestart = true)}>Začít znovu</button>
+            <button type="button" class="btn btn-primary" disabled={busy} onclick={reopenGame}>Pokračovat v zápisu</button>
+          </div>
+        {/if}
       </div>
       {#if plays.length}
         <section class="feed">
@@ -787,12 +802,22 @@
       <div class="card done" in:fade={{ duration: 150 }}>
         <Icon name="flag" size={28} />
         <h2>Živý zápis za {team.short_name ?? team.name} je ukončený</h2>
-        <p class="muted">Všechny zápisy jsou v box score zápasu. Pokud se ještě hraje, můžeš pokračovat.</p>
-        <div class="row">
-          <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
-          <button type="button" class="btn" disabled={busy} onclick={() => (mode = 'restart')}>Začít znovu</button>
-          <button type="button" class="btn btn-primary" disabled={busy} onclick={() => finish(false)}>Pokračovat v zápisu</button>
-        </div>
+        {#if dayOver}
+          <p class="muted">Zápas už proběhl. Opravit jednotlivé akce jde dál tužkou v průběhu zápasu, znovu otevřít zápis může jen správce.</p>
+          <div class="row">
+            <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
+            {#if admin.unlocked}
+              <button type="button" class="btn btn-primary" disabled={busy} onclick={() => finish(false)}>Otevřít znovu (správce)</button>
+            {/if}
+          </div>
+        {:else}
+          <p class="muted">Všechny zápisy jsou v box score zápasu. Pokud se ještě hraje, můžeš pokračovat.</p>
+          <div class="row">
+            <a class="btn btn-dark" href="/zapasy/{id}">Box score</a>
+            <button type="button" class="btn" disabled={busy} onclick={() => (mode = 'restart')}>Začít znovu</button>
+            <button type="button" class="btn btn-primary" disabled={busy} onclick={() => finish(false)}>Pokračovat v zápisu</button>
+          </div>
+        {/if}
       </div>
       {#if plays.length}
         <section class="feed">

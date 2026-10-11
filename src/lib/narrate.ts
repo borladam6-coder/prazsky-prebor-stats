@@ -50,7 +50,11 @@ const flyLike = (k: PlayKind | null) => k === 'fly' || k === 'line' || k === 'po
 function batterPhrase(d: PlayDetail, result: PaResult, runs: number): string {
   const to = where(d.location);
   const at = (verb: string) => (to ? `${verb} to ${to}` : verb);
-  const kind = result === d.result ? d.kind : null; // an edited result drops the recorded kind
+  // an edited result drops the recorded kind; where the ball went stays, but who made
+  // the error or fielded it is not known then
+  const edited = result !== d.result;
+  const kind = edited ? null : d.kind;
+  const by = edited ? null : fielder(d.location);
   switch (result) {
     case '1B':
       return at('singles');
@@ -68,9 +72,9 @@ function batterPhrase(d: PlayDetail, result: PaResult, runs: number): string {
     case 'K':
       return (d.batterTo ?? 0) > 0 ? 'strikes out but reaches on a dropped third strike' : 'strikes out';
     case 'ROE':
-      return d.location ? `reaches on an error by the ${fielder(d.location)}` : 'reaches on an error';
+      return by ? `reaches on an error by the ${by}` : 'reaches on an error';
     case 'FC':
-      return d.location ? `reaches on a fielder's choice, fielded by the ${fielder(d.location)}` : "reaches on a fielder's choice";
+      return by ? `reaches on a fielder's choice, fielded by the ${by}` : "reaches on a fielder's choice";
     case 'SF':
       return at('hits a sacrifice fly');
     case 'SH':

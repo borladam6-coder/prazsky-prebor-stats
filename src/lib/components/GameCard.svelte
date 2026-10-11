@@ -48,7 +48,7 @@
       {:else if recorded === 1}
         <span class="pill warn">Zapsán 1 tým</span>
       {:else}
-        <span class="pill warn">Chybí statistiky</span>
+        <span class="pill neutral" title="Bez statistik, jen výsledek ze softball.cz">{game.home_score !== null ? 'Jen výsledek' : 'Bez zápisu'}</span>
       {/if}
     </span>
     <span class="side" class:won={homeWon} class:lost={awayWon}>
