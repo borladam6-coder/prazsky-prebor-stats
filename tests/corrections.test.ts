@@ -63,7 +63,7 @@ before(async () => {
   await t.importFixture();
   await t.q(`update private.settings set admin_code_hash = extensions.crypt('K7QXM2PA9TRH4WZD', extensions.gen_salt('bf', 4))`);
   c = t.newCaller('Opravář');
-  [game] = await t.q(`select * from games where status = 'played' order by id limit 1`);
+  [game] = await t.q(`select * from games where status = 'played' and id > 0 order by id limit 1`);
   home = (await t.q(`select id from players where team_id = $1 and active order by name limit 9`, [game.home_team_id])).map((p) => p.id);
   away = (await t.q(`select id from players where team_id = $1 and active order by name limit 9`, [game.away_team_id])).map((p) => p.id);
   await t.rpc(c, 'live_start', { p_game_id: game.id, p_team_id: game.away_team_id, p_lineup: away });
@@ -227,7 +227,7 @@ test('reset wipes the game; the administrator can restore it exactly', async () 
 });
 
 test('admin code can be changed', async () => {
-  await expectError(t.rpc(c, 'admin_change_code', { p_code: CODE, p_new_code: 'short' }), /12/);
+  await expectError(t.rpc(c, 'admin_change_code', { p_code: CODE, p_new_code: 'ab-c' }), /aspoň 4/);
   await t.rpc(c, 'admin_change_code', { p_code: CODE, p_new_code: 'NEWC-ODE1-2345-6789' });
   const check = (code: string) => t.as<{ r: string }>('anon', `select public.admin_check($1, $2) as r`, [code, c.device], c.ip).then((r) => r[0].r);
   assert.equal(await check('newc-ode1-2345-6789'), 'ok');

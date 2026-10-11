@@ -54,9 +54,9 @@ before(async () => {
   t = await createDb();
   await t.importFixture();
   c = t.newCaller('Zapisovatel');
-  [game] = await t.q(`select * from games where status = 'played' order by id limit 1`);
+  [game] = await t.q(`select * from games where status = 'played' and id > 0 order by id limit 1`);
   [other] = await t.q(
-    `select * from games where status = 'played' and $1 not in (home_team_id, away_team_id) order by id limit 1`,
+    `select * from games where status = 'played' and id > 0 and $1 not in (home_team_id, away_team_id) order by id limit 1`,
     [game.home_team_id]
   );
   const home = await t.q(`select id from players where team_id = $1 and active order by name`, [game.home_team_id]);
@@ -79,7 +79,7 @@ test('start validates the team and the lineup', async () => {
   await expectError(start(other.id, game.home_team_id, lineup), /nehraje/);
   await expectError(start(game.id, game.home_team_id, [...lineup, opponent]), /nehraje za tento tým/);
   await expectError(start(game.id, game.home_team_id, [lineup[0], lineup[0]]), /dvakrát/);
-  await expectError(start(game.id, game.home_team_id, []), /1–20/);
+  await expectError(start(game.id, game.home_team_id, []), /1–10/);
 
   const s = await start(game.id, game.home_team_id, lineup);
   assert.equal(s.inning, 1);
@@ -284,7 +284,7 @@ test('statistics stay consistent with the plays', async () => {
 test('simulation: browser logic and database agree play by play', async () => {
   const team = game.away_team_id;
   const players = (await t.q(`select id from players where team_id = $1 and active order by name`, [team])).map((p) => p.id);
-  const order = players.slice(0, 12);
+  const order = players.slice(0, 10);
   const sim = t.newCaller('Simulace');
   await t.rpc(sim, 'live_start', { p_game_id: game.id, p_team_id: team, p_lineup: order });
 

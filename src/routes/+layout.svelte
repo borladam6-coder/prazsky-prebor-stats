@@ -102,6 +102,7 @@
 <footer class="foot">
   <span>{league.season?.name ?? 'Pražský přebor mužů'} {league.season?.year ?? ''}, komunitní statistiky</span>
   <a class="link-accent" href="/historie">Historie změn</a>
+  <a class="link-accent" href="/zapasy/-1/zive">Vyzkoušet zápis</a>
   <p class="note">
     Bez napojení na Českou softballovou asociaci. Tabulka, rozpis a soupisky pochází z
     <a href="https://softball.cz/ligy/PPM" rel="noopener">softball.cz</a>, pálkařské statistiky zapisují hráči sami.

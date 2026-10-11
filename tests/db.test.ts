@@ -66,7 +66,7 @@ async function importFixture(opts = {}) {
 }
 
 async function playedGame(): Promise<{ game: Row; home: Row[]; away: Row[] }> {
-  const [game] = await q(`select * from games where status = 'played' order by id limit 1`);
+  const [game] = await q(`select * from games where status = 'played' and id > 0 order by id limit 1`);
   const home = await q(`select * from players where team_id = $1 and active order by name`, [game.home_team_id]);
   const away = await q(`select * from players where team_id = $1 and active order by name`, [game.away_team_id]);
   return { game, home, away };
@@ -104,12 +104,12 @@ test('import stores only allowed data and is idempotent', async () => {
   }
 
   const [counts] = await q(`select
-    (select count(*) from teams)::int teams, (select count(*) from games)::int games,
-    (select count(*) from players)::int players, (select count(*) from standings)::int standings,
+    (select count(*) from teams where id > 0)::int teams, (select count(*) from games where season_id <> -1)::int games,
+    (select count(*) from players where season_id <> -1)::int players, (select count(*) from standings)::int standings,
     (select count(*) from seasons where is_current)::int current`);
   assert.deepEqual(counts, { teams: 10, games: 45, players: 140, standings: 10, current: 1 });
 
-  const colors = await q(`select color from teams`);
+  const colors = await q(`select color from teams where id > 0`);
   assert.equal(new Set(colors.map((c) => c.color)).size, 10, 'each team gets a distinct color');
 
   const logos = await q(`select id, logo_url from teams where id in (196, 129) order by id`);
@@ -367,7 +367,7 @@ interface Tally { pa: number; ab: number; h: number; s: number; d: number; t: nu
 
 test('random game simulation: views match an independent calculation', async () => {
   // fresh players so earlier tests do not interfere
-  const games = await q(`select * from games where status = 'played' order by id offset 3 limit 12`);
+  const games = await q(`select * from games where status = 'played' and id > 0 order by id offset 3 limit 12`);
   const results = ['1B','1B','1B','2B','3B','HR','BB','HBP','K','K','OUT','OUT','OUT','FC','ROE','SF','SH'];
   const AB = new Set(['1B','2B','3B','HR','K','OUT','FC','ROE']);
   const TB: Record<string, number> = { '1B': 1, '2B': 2, '3B': 3, HR: 4 };

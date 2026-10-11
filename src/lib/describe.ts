@@ -167,6 +167,8 @@ export function describe(group: ChangeGroup, entries: ChangeEntry[]): Described 
       return { title: 'Správce vrátil změnu', context: gameLabel(gameId), gameId };
     case 'admin_change_code':
       return { title: 'Změna kódu správce', context: null, gameId: null };
+    case 'test_reset':
+      return { title: 'Testovací zápas vynulován', context: gameLabel(gameId), gameId };
   }
 
   const prefix = group.action === 'revert' ? 'Vrácení změny: ' : '';
