@@ -11,7 +11,7 @@
   import { outsWord, plural } from '../format.ts';
   import {
     applyPlay, batterChoices, cascade, defaultFieldOut, defaultPlay, defaultRbi, destLabel, fieldOutBatterChoices,
-    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay, endsInning,
+    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay, endsInning, nominalBase, outAfterHit,
     type Base, type Bases, type Dest, type FieldOut, type Play
   } from '../live.ts';
   import type { PaResult } from '../types.ts';
@@ -95,7 +95,7 @@
    * The batter makes the third out: the inning is over, so runners can only stay or be
    * out (nothing they do counts any more).
    */
-  const isLocked = (p: Play) => !!p.result && p.batterTo === 0 && endsInning(p, outs);
+  const isLocked = (p: Play) => !!p.result && p.batterTo === 0 && !outAfterHit(p) && endsInning(p, outs);
   const locked = $derived(isLocked(play));
   const lockRunners = (p: Play): Play =>
     isLocked(p) ? { ...p, runners: p.runners.map((r) => (r.to === 0 || r.to === r.from ? r : { ...r, to: r.from })) } : p;
@@ -131,7 +131,7 @@
   }
 
   function setBatter(to: Dest) {
-    settle({ ...play, batterTo: to });
+    settle({ ...play, batterTo: to, extra: result && to > nominalBase(result) && to < 4 ? play.extra : null });
   }
 
   function syncRbi() {
@@ -212,10 +212,18 @@
         <div class="choices">
           {#each batterOptions as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={play.batterTo === d} onclick={() => setBatter(d)}>
-              {d === 0 ? 'Out' : d === 4 ? 'Scored' : `${d}. meta`}
+              {d === 0 ? (result && ['1B', '2B', '3B'].includes(result) ? `Out na ${nominalBase(result) + 1}.` : 'Out') : d === 4 ? 'Scored' : `${d}. meta`}
             </button>
           {/each}
         </div>
+        {#if result && play.batterTo !== null && play.batterTo > nominalBase(result) && play.batterTo < 4}
+          <div class="extra" role="group" aria-label="Proč se dostal dál">
+            <span class="muted">Dál se dostal</span>
+            {#each [['throw', 'na hod'], ['error', 'na error'], [null, 'neuvádět']] as [v, label] (label)}
+              <button type="button" class="xch" aria-pressed={(play.extra ?? null) === v} onclick={() => (play = { ...play, extra: v as Play['extra'] })}>{label}</button>
+            {/each}
+          </div>
+        {/if}
       </fieldset>
     {/if}
 
@@ -509,6 +517,29 @@
     accent-color: var(--accent);
     flex: none;
     margin: 0;
+  }
+  .extra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .xch {
+    min-height: 34px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .xch[aria-pressed='true'] {
+    background: var(--pill-active-bg);
+    border-color: var(--pill-active-bg);
+    color: var(--pill-active-ink);
   }
   .locked {
     margin: 0;

@@ -27,13 +27,25 @@ export interface Play {
   kind?: PlayKind | null;
   /** where the ball went (optional, detailed scoring) */
   location?: FieldPos | null;
+  /** why the batter got past the base of his hit (optional): on an error or on the throw */
+  extra?: BatterExtra | null;
 }
+
+export type BatterExtra = 'error' | 'throw';
+const HIT_BASE: Partial<Record<PaResult, number>> = { '1B': 1, '2B': 2, '3B': 3 };
+/** base the result alone gives the batter (1 for a walk, 2 for a double …), 0 for an out */
+export function nominalBase(result: PaResult): number {
+  return HIT_BASE[result] ?? (['BB', 'HBP', 'ROE', 'FC', 'CI'].includes(result) ? 1 : result === 'HR' ? 4 : 0);
+}
+/** the batter is out after a hit: thrown out trying for one more base */
+export const outAfterHit = (p: Pick<Play, 'result' | 'batterTo'>) => !!p.result && p.result in HIT_BASE && p.batterTo === 0;
 
 /** Where a batter may end up with a given result (inclusive range). */
 export const BATTER_RANGE: Record<PaResult, [Dest, Dest]> = {
-  '1B': [1, 4],
-  '2B': [2, 4],
-  '3B': [3, 4],
+  // a hit stays a hit when the batter is then put out trying for one more base (0)
+  '1B': [0, 4],
+  '2B': [0, 4],
+  '3B': [0, 4],
   HR: [4, 4],
   BB: [1, 4],
   HBP: [1, 4],
@@ -174,7 +186,8 @@ export const endsInning = (play: Pick<Play, 'batterTo' | 'runners'>, outs: numbe
  */
 export function runsCountOnThirdOut(play: Pick<Play, 'result' | 'batterTo' | 'runners'>, bases: Bases): boolean {
   if (!play.result) return true; // runner-only play: e.g. caught stealing after a run scored
-  if (play.batterTo === null || play.batterTo === 0) return false;
+  // batter out after a hit (tagged trying for one more base) is a time play too
+  if (play.batterTo === null || (play.batterTo === 0 && !outAfterHit(play))) return false;
   for (const r of play.runners) {
     if (r.to !== 0) continue;
     let forcedOut = true;

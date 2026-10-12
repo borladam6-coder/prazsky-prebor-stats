@@ -39,6 +39,8 @@ export interface PlayDetail {
   location: FieldPos | null;
   batterTo: number | null;
   runners: RunnerDetail[];
+  /** why the batter got past the base of his hit: 'error' | 'throw' */
+  batterExtra?: string | null;
 }
 
 const BASE = ['home', '1st', '2nd', '3rd', 'home'];
@@ -139,8 +141,10 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
   if (result && d.batterTo !== null) {
     const nominal = HIT_BASES[result] ?? (['BB', 'HBP', 'ROE', 'FC', 'CI'].includes(result) ? 1 : 0);
     if (d.batterTo === 4 && result !== 'HR') parts.push(`${batter} scores`);
-    else if (d.batterTo > nominal && d.batterTo < 4 && nominal > 0) parts.push(`${batter} to ${BASE[d.batterTo]}`);
-    else if (d.batterTo === 0 && isHit(result)) parts.push(`${batter} out at ${BASE[nominal + 1]}`);
+    else if (d.batterTo > nominal && d.batterTo < 4 && nominal > 0) {
+      const why = d.batterExtra === 'error' ? ' on an error' : d.batterExtra === 'throw' ? ' on the throw' : '';
+      parts.push(`${batter} to ${BASE[d.batterTo]}${why}`);
+    } else if (d.batterTo === 0 && isHit(result)) parts.push(`${batter} out at ${BASE[nominal + 1]} trying to advance`);
     else if (d.batterTo === 0 && (d.kind === 'dp' || d.runners.some((r) => r.to === 0)) && !flyLike(d.kind)) parts.push(`${batter} out at 1st`);
   }
 

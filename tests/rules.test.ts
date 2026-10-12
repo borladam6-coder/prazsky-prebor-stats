@@ -97,3 +97,23 @@ test('tie-breaker: from the 8th inning the last batter starts on second; undo re
   assert.deepEqual([back.inning, back.outs, back.runner_2], [7, 2, null]);
   assert.deepEqual(await t.as('anon', CONSISTENCY), []);
 });
+
+test('a hit with the batter out trying for one more base; the reason he got further', async () => {
+  await state(1, 2, [null, order[5], null], 0);
+  // single, run scores, batter tagged out at second for the third out: hit, out, run counts
+  await play('1B', 0, [{ from: 2, to: 4 }]);
+  const [l] = await t.q(`select pa::int, ab::int, h::int from player_game_batting where game_id = $1 and player_id = $2`, [G, order[0]]);
+  assert.deepEqual(l, { pa: 1, ab: 1, h: 1 });
+  const [{ r }] = await t.q(`select coalesce(sum(r), 0)::int r from player_game_batting where game_id = $1`, [G]);
+  assert.equal(r, 1);
+  assert.equal((await session()).inning, 2);
+  // single and to second on an error
+  const s = await session();
+  await t.rpc(c, 'live_play_detailed', {
+    p_client_id: crypto.randomUUID(), p_game_id: G, p_team_id: TEAM, p_expected_version: s.version,
+    p_result: '1B', p_batter_to: 2, p_runners: '[]', p_rbi: null, p_kind: null, p_location: null, p_batter_extra: 'error'
+  });
+  const [d] = await t.q(`select result, batter_to, batter_extra from live_play_details where game_id = $1 order by created_at desc limit 1`, [G]);
+  assert.deepEqual(d, { result: '1B', batter_to: 2, batter_extra: 'error' });
+  assert.deepEqual(await t.as('anon', CONSISTENCY), []);
+});

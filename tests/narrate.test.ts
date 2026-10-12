@@ -24,7 +24,7 @@ test('hits, walks and strikeouts', () => {
   assert.equal(say({ result: 'K', batterTo: 0 }), 'Lehký Lukáš strikes out.');
   assert.equal(say({ result: 'ROE', batterTo: 1, location: 'SS' }), 'Lehký Lukáš reaches on an error by the shortstop.');
   assert.equal(say({ result: '1B', batterTo: 2 }), 'Lehký Lukáš singles. Lehký Lukáš to 2nd.', 'extra base on the throw');
-  assert.equal(say({ result: '2B', batterTo: 0 }), 'Lehký Lukáš doubles. Lehký Lukáš out at 3rd.', 'thrown out stretching');
+  assert.equal(say({ result: '2B', batterTo: 0 }), 'Lehký Lukáš doubles. Lehký Lukáš out at 3rd trying to advance.', 'thrown out stretching');
 });
 
 test('outs in the field: double play, fielder\'s choice, sacrifices', () => {
@@ -73,4 +73,10 @@ test('half-inning totals: runs, hits, errors, left on base', () => {
   ]);
   assert.deepEqual(s, { runs: 1, hits: 2, errors: 1, lob: 2 });
   assert.equal(halfSummary([play('1B', 0)]).lob, null, 'still going');
+});
+
+test('a hit with the batter out trying for one more base, and the reason he got further', () => {
+  assert.equal(say({ result: '1B', batterTo: 0 }), 'Lehký Lukáš singles. Lehký Lukáš out at 2nd trying to advance.');
+  assert.equal(say({ result: '1B', batterTo: 2, batterExtra: 'error' }), 'Lehký Lukáš singles. Lehký Lukáš to 2nd on an error.');
+  assert.equal(say({ result: '2B', batterTo: 3, batterExtra: 'throw' }), 'Lehký Lukáš doubles. Lehký Lukáš to 3rd on the throw.');
 });
