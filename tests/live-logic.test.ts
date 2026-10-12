@@ -199,3 +199,21 @@ test('detailed scoring: every out asks how, line and pop outs behave like a fly'
     assert.equal(validatePlay(defaultFieldOut(k, [null, null, null], 1), [null, null, null], 1), null, k);
   }
 });
+
+test('softball rules on the client: dropped third strike, runs on the third out, tie-breaker', async () => {
+  const { validatePlay: v, applyPlay: a, batterChoices: bc } = await import('../src/lib/live.ts');
+  // dropped third strike
+  assert.deepEqual(bc('K', ['x', null, null], 0), [0], 'first base taken, < 2 outs: batter cannot run');
+  assert.deepEqual(bc('K', ['x', null, null], 2), [0, 1, 2, 3, 4]);
+  assert.match(v({ result: 'K', batterTo: 1, runners: [{ from: 1, to: 2 }], rbi: 0 }, ['x', null, null], 1) ?? '', /dropped third strike/);
+  // third out
+  assert.match(v({ result: 'OUT', batterTo: 0, runners: [{ from: 3, to: 4 }], rbi: 0 }, [null, null, 'z'], 2) ?? '', /nepočítá/);
+  assert.match(v({ result: '1B', batterTo: 1, runners: [{ from: 1, to: 0 }, { from: 3, to: 4 }], rbi: 0 }, ['x', null, 'z'], 2) ?? '', /nepočítá/);
+  assert.equal(v({ result: '1B', batterTo: 1, runners: [{ from: 2, to: 0 }, { from: 3, to: 4 }], rbi: 1 }, [null, 'y', 'z'], 2), null, 'time play');
+  // tie-breaker
+  const lineup = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+  const end7 = a({ inning: 7, outs: 2, bases: [null, null, null], nextSlot: 3 }, lineup, { result: 'K', batterTo: 0, runners: [], rbi: 0 });
+  assert.deepEqual([end7.inning, end7.bases], [8, [null, 'd', null]]);
+  const end6 = a({ inning: 6, outs: 2, bases: [null, null, null], nextSlot: 3 }, lineup, { result: 'K', batterTo: 0, runners: [], rbi: 0 });
+  assert.deepEqual(end6.bases, [null, null, null]);
+});

@@ -17,7 +17,7 @@ with raw_lines as (
     select game_id, player_id,
       count(*) as n,
       count(*) filter (where result in ('1B','2B','3B','HR')) as h,
-      count(*) filter (where result not in ('BB','HBP','SF','SH')) as ab,
+      count(*) filter (where result not in ('BB','HBP','SF','SH','CI')) as ab,
       sum(case result when '1B' then 1 when '2B' then 2 when '3B' then 3 when 'HR' then 4 else 0 end) as tb,
       sum(rbi) as rbi
     from public.plate_appearances
@@ -66,8 +66,12 @@ union all
 select 'identity broken', player_id::text || ' @ ' || game_id,
        format('PA=%s AB=%s BB=%s HBP=%s SF=%s SH=%s H=%s 1B=%s 2B=%s 3B=%s HR=%s TB=%s R=%s RBI=%s',
               pa, ab, bb, hbp, sf, sh, h, singles, doubles, triples, hr, tb, r, rbi)
-from public.player_game_batting
-where pa <> ab + bb + hbp + sf + sh
+from public.player_game_batting l
+where pa <> ab + bb + hbp + sf + sh + (
+    -- catcher's interference: a plate appearance outside AB, BB, HBP and sacrifices
+    select count(*) from public.plate_appearances p
+    where p.game_id = l.game_id and p.player_id = l.player_id and p.result = 'CI' and p.deleted_at is null
+  )
    or h <> singles + doubles + triples + hr
    or tb <> singles + 2 * doubles + 3 * triples + 4 * hr
    or h > ab

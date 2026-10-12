@@ -14,7 +14,7 @@
   import { admin } from '#lib/admin.svelte.ts';
   import { PlayQueue } from '#lib/queue.svelte.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
-  import { defaultPlay, runsOn, type Base, type Bases, type Play } from '#lib/live.ts';
+  import { defaultPlay, runsOn, REGULATION_INNINGS, type Base, type Bases, type Play } from '#lib/live.ts';
   import { battingTeam } from '#lib/plays.ts';
   import { outsWord, plural, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
@@ -53,7 +53,7 @@
   const open = $derived.by(() => {
     if (!game || game.status === 'cancelled' || game.status === 'canceled') return false;
     if (game.status === 'played') return true;
-    return !!game.starts_at && new Date(game.starts_at).getTime() <= Date.now() + 2 * 3600_000;
+    return league.isPlayable(game);
   });
   const started = $derived(!!game && league.isPlayable(game));
 
@@ -67,6 +67,10 @@
   let busy = $state(false);
 
   let mode = $state<'score' | 'lineup' | 'state' | 'restart' | 'admin'>('score');
+  /** "the game may be over" offer after the regulation innings, hidden once dismissed */
+  let endDismissed = $state('');
+  /** lineup opened from the batter card: substitute the batter who is up (pinch hitter) */
+  let pinchSlot = $state<number | null>(null);
   let moreOpen = $state(false);
   let sheet = $state<{ result: PaResult | null; runnerFrom: Base | null } | null>(null);
   let confirmFinish = $state(false);
@@ -507,7 +511,8 @@
   const saveLineup = (ids: string[], next: number | null) =>
     run(() => liveSetLineup(session!, ids, next), () => {
       mode = 'score';
-      lastPlay = 'Pořadí pálkařů uloženo.';
+      lastPlay = pinchSlot !== null ? `Na pálce je ${league.player(ids[pinchSlot])?.name ?? 'náhradník'}.` : 'Pořadí pálkařů uloženo.';
+      pinchSlot = null;
     });
 
   const finish = (finished: boolean) =>
@@ -540,8 +545,10 @@
   const editPlay = (p: PlayItem) => {
     if (synced()) editing = p;
   };
-  const openLineup = () => {
-    if (synced()) mode = 'lineup';
+  const openLineup = (slot: number | null = null) => {
+    if (!synced()) return;
+    pinchSlot = slot;
+    mode = 'lineup';
   };
   function openAdmin() {
     moreOpen = false;
@@ -640,6 +647,34 @@
       !!team && !!session && !session.finished && mode === 'score'
   );
 
+  /**
+   * The game is over by the score after the regulation innings: home ahead after the top of
+   * the 7th (or later), anybody ahead after a complete inning, or a walk-off in the bottom.
+   * With one team scored only the end of the 7th is known.
+   */
+  const endOffer = $derived.by((): { key: string; text: string } | null => {
+    if (!scoringVisible || !session) return null;
+    const clean = (x: LiveSession) => x.outs === 0 && !x.runner_1 && !x.runner_2 && !x.runner_3;
+    if (fullGame && homeS && awayS && game) {
+      const hr = runsOf(game.home_team_id);
+      const ar = runsOf(game.away_team_id);
+      if (awayS.inning > REGULATION_INNINGS && homeS.inning === awayS.inning - 1 && clean(homeS) && hr > ar) {
+        return { key: `top${homeS.inning}`, text: `Po horní polovině ${homeS.inning}. směny vedou domácí ${hr}:${ar}, dolní polovina se nehraje.` };
+      }
+      if (homeS.inning >= REGULATION_INNINGS && awayS.inning > homeS.inning && hr > ar) {
+        return { key: `walk${homeS.inning}`, text: `Domácí vedou ${hr}:${ar} v dolní polovině ${homeS.inning}. směny, zápas skončil.` };
+      }
+      if (homeS.inning > REGULATION_INNINGS && homeS.inning === awayS.inning && clean(homeS) && clean(awayS) && hr !== ar) {
+        return { key: `end${homeS.inning}`, text: `Dohráno ${homeS.inning - 1} směn, skóre ${hr}:${ar}.` };
+      }
+      return null;
+    }
+    if (!fullGame && session.inning === REGULATION_INNINGS + 1 && clean(session)) {
+      return { key: `team${session.inning}`, text: `Dohráno ${REGULATION_INNINGS} směn.` };
+    }
+    return null;
+  });
+
   const teamRoster = $derived(teamId ? league.teamPlayers(teamId, true) : []);
   const statusOf = (tid: number | undefined) => sessions.find((s) => s.team_id === tid);
 </script>
@@ -674,7 +709,7 @@
     {:else if !loaded}
       <Skeleton rows={3} height={110} />
     {:else if !open}
-      <p class="empty">Živý zápis se otevře 2 hodiny před začátkem zápasu{game.starts_at ? ` (začátek v ${time(game.starts_at)})` : ''}.</p>
+      <p class="empty">Živý zápis se otevře v den zápasu{game.starts_at ? ` (${new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', weekday: 'long', day: 'numeric', month: 'numeric' }).format(new Date(game.starts_at))}, začátek v ${time(game.starts_at)})` : ''}.</p>
     {:else if scoring === null}
       <!-- ---------------------------------------------------------- choose the way of scoring -->
       <div class="modes">
@@ -834,10 +869,11 @@
         gameId={id}
         initial={lineup}
         nextSlot={session.next_slot}
+        replaceSlot={pinchSlot}
         saveLabel="Uložit pořadí"
         {busy}
         onsave={saveLineup}
-        oncancel={() => (mode = 'score')}
+        oncancel={() => { mode = 'score'; pinchSlot = null; }}
       />
     {:else if mode === 'admin'}
       <!-- ---------------------------------------------------------- administrator -->
@@ -942,6 +978,20 @@
         {/if}
       </section>
 
+      {#if endOffer && endDismissed !== endOffer.key}
+        <div class="endoffer card" role="status" in:fade={{ duration: 150 }}>
+          <Icon name="flag" size={22} />
+          <div>
+            <strong>Konec zápasu?</strong>
+            <p class="muted">{endOffer.text}</p>
+            <div class="row">
+              <button type="button" class="btn btn-primary btn-sm" disabled={busy} onclick={() => { if (synced()) finish(true); }}>Ukončit zápis</button>
+              <button type="button" class="btn btn-quiet btn-sm" onclick={() => (endDismissed = endOffer.key)}>Hrajeme dál</button>
+            </div>
+          </div>
+        </div>
+      {/if}
+
       {#if queue && queue.status === 'error'}
         <div class="qerr card" role="alert" in:fade={{ duration: 150 }}>
           <strong>{pending} {plural(pending, ['akci', 'akce', 'akcí'])} se nepodařilo uložit</strong>
@@ -964,6 +1014,9 @@
           <span class="next muted">
             {#if onDeck}Další: <strong>{onDeck.name}</strong>{/if}{#if inHole}, pak {inHole.name}{/if}
           </span>
+          <button type="button" class="btn btn-quiet btn-sm pinch" disabled={busy} onclick={() => openLineup(session.next_slot)} aria-label="Vystřídat pálkaře na řadě (pinch hitter)">
+            <Icon name="swap" size={16} /> Střídat
+          </button>
         </section>
       {/key}
 
@@ -975,7 +1028,7 @@
         <button type="button" class="btn btn-dark btn-sm" disabled={busy || occupiedCount === 0} onclick={() => (sheet = { result: null, runnerFrom: ([3, 2, 1] as Base[]).find((b) => bases[b - 1]) ?? null })}>
           <Icon name="swap" size={16} /> Pohyb běžců
         </button>
-        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={openLineup}><Icon name="player" size={16} /> Pořadí a střídání</button>
+        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => openLineup()}><Icon name="player" size={16} /> Pořadí a střídání</button>
         <span class="more-wrap">
           <button type="button" class="btn btn-quiet btn-sm" aria-expanded={moreOpen} aria-haspopup="menu" onclick={() => { moreOpen = !moreOpen; confirmFinish = false; }}>
             <Icon name="more" size={16} /> Další možnosti
@@ -996,6 +1049,9 @@
                   <Icon name="flag" size={18} /><span><strong>Ukončit zápis</strong><small>Po posledním outu zápasu</small></span>
                 </button>
               {/if}
+              <button type="button" role="menuitem" disabled={busy} onclick={() => { moreOpen = false; tapResult('CI'); }}>
+                <Icon name="player" size={18} /><span><strong>Catcher's interference (CI)</strong><small>Pálkař na 1. metu kvůli catcherovi: PA, ale ne AB</small></span>
+              </button>
               <button type="button" role="menuitemcheckbox" aria-checked={detailed} onclick={toggleDetailed}>
                 <Icon name="tune" size={18} /><span><strong>Podrobný zápis: {detailed ? 'zapnutý' : 'vypnutý'}</strong><small>{detailed ? 'U odpalů se ptá, kam letěl míč (nepovinné), u každého outu jak' : 'Zapni, chceš-li zapisovat, kam letěl míč a druh outu'}</small></span>
               </button>
@@ -1522,6 +1578,14 @@
     font-size: 13px;
     font-weight: 600;
   }
+  .pinch {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+  .atbat {
+    position: relative;
+  }
   .next {
     grid-column: 1 / -1;
     font-size: 13px;
@@ -1593,6 +1657,21 @@
     to {
       transform: rotate(360deg);
     }
+  }
+  .endoffer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 10px;
+    padding: 14px;
+    border-color: var(--accent);
+  }
+  .endoffer p {
+    margin: 2px 0 10px;
+    font-size: 14px;
+  }
+  .atbat .info {
+    padding-right: 80px;
   }
   .qerr {
     margin-top: 10px;

@@ -73,6 +73,7 @@ export const RESULTS: ResultDef[] = [
   { code: 'OUT', label: 'Out', group: 'out' },
   { code: 'SF', label: 'Sacrifice fly', group: 'out' },
   { code: 'SH', label: 'Sacrifice bunt', group: 'out' },
+  { code: 'CI', label: "Catcher's interference", group: 'onbase' },
   { code: 'FC', label: "Fielder's choice", group: 'out' },
   { code: 'ROE', label: 'Reached on error', group: 'out' }
 ];

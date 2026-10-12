@@ -12,6 +12,15 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
+- Krok 18: herní pravidla a zápis od dne zápasu.
+  - Zapisovat (živě i ručně) jde celý den zápasu od půlnoci, ne až od začátku.
+  - Při 3. outu, kdy je out pálkař, se běžci nabízí jen Out / Zůstal a run se nepočítá; po force outu se run nepočítá, jen při time play (běžec vyautovaný dotykem).
+  - Dropped third strike: pálkař smí běžet jen při volné 1. metě nebo při 2 outech.
+  - Tie-breaker: od 8. směny začíná každá polovina s posledním pálkařem na 2. metě (Zpět ho zase odebere).
+  - Nový výsledek CI (catcher's interference, v Další možnosti): PA, ale ne AB.
+  - Tlačítko Střídat na kartě pálkaře (pinch hitter), upozornění na podobné jméno při přidání hráče, plná sestava nového hráče jen přidá na soupisku.
+  - Po 7. směně (nebo walk-off) web nabídne Ukončit zápis.
+- Krok 17 (nový design) byl vrácen, web má design z kroku 16.
 - Krok 16: OUT s prázdnými metami se dělí na Fly out a Ground out (jedno klepnutí), ruční zápis zase jde u týmu, jehož živý zápis byl smazaný nebo nemá žádné akce.
 - Krok 15: živý zápis se po dni zápasu sám ukončí (každou noc, znovu otevřít ho pak může jen správce), oprava akcí přímo v detailu zápasu (záložka Průběh, např. hit → error, u akce je vidět „opraveno · původně 2B“), filtr zápasů Se zápisem / Jen výsledek, import ze softball.cz jednou za 3 dny.
 - Krok 14: průběh zápasu jako oficiální play-by-play anglicky („Skokan Sváťa grounds into a double play to shortstop. Pevný Pavel forced out at 2nd. Skokan Sváťa out at 1st.“), souhrn každé poloviny směny (runs, hits, errors, LOB), přepínač Podrobný zápis (kam šel míček, line out / pop out, vždy jde „Neuvádět“).
@@ -24,7 +33,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 
 ## Živý zápis
 
-1. V detailu zápasu (nejdřív 2 hodiny před začátkem) klikni **Zapisovat živě** a vyber režim:
+1. V detailu zápasu (od rána dne zápasu) klikni **Zapisovat živě** a vyber režim:
    - **Zapisovat celý zápas:** zadáš sestavu hostů, pak domácích, a dáš Začít zápas. Pálka se po 3 outech střídá (hosté ▲, domácí ▼).
    - **Zapisovat jen jeden tým:** vybereš tým a klikáš jeho pálkaře, pořadí se posouvá a soupeř se nepřepíná.
 2. Klepáním na hráče ze soupisky sestav pořadí pálkařů (nebo **Pořadí z minulého zápasu**), pořadí změníš přetažením za úchyt. Dej **Začít zápis**.
@@ -66,6 +75,7 @@ supabase/migrations/001_init.sql   databáze: tabulky, zabezpečení, zápisové
 supabase/migrations/002_live.sql   živý zápis: pořadí pálkařů, stav směny, akce a jejich vracení
 supabase/migrations/003_live_undo_game.sql  vracení poslední akce zápasu při zápisu obou týmů
 supabase/migrations/004_admin_and_corrections.sql  opravy živého zápisu, správce (reset zápasu, ruční skóre)
+supabase/migrations/013_gameday_ci_rules.sql  zápis od dne zápasu, CI, pravidla 3. outu a dropped third strike, tie-breaker
 supabase/migrations/012_manual_after_reset.sql  ruční zápis znovu povolený, když živý zápis týmu nemá žádné akce
 supabase/migrations/011_autofinish.sql  automatické ukončení živého zápisu po dni zápasu, znovuotevření jen správcem
 supabase/migrations/010_play_details.sql  podrobnosti akcí pro play-by-play (druh, místo, běžci)
@@ -92,7 +102,7 @@ netlify.toml                       nastavení buildu, přesměrování, bezpečn
 ### 1. Supabase
 
 1. Na [supabase.com](https://supabase.com) vytvoř **nový projekt**. Region zvol Evropu (např. Frankfurt).
-2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql`, `010_play_details.sql`, `011_autofinish.sql` a `012_manual_after_reset.sql`. Migrace se spouští postupně a každá jen jednou.
+2. Otevři **SQL Editor**, vlož celý obsah `supabase/migrations/001_init.sql` a dej **Run**. Má proběhnout bez chyby. Potom stejně spusť `002_live.sql`, `003_live_undo_game.sql`, `004_admin_and_corrections.sql`, `005_offline_and_manual_lock.sql`, `006_lineup_admin_testgame.sql`, `007_exact_undo.sql`, `008_import_rosters_once.sql`, `009_english_terms.sql`, `010_play_details.sql`, `011_autofinish.sql`, `012_manual_after_reset.sql` a `013_gameday_ci_rules.sql`. Migrace se spouští postupně a každá jen jednou.
 3. Pro další kroky si připrav tyto údaje:
    - **Project URL**: tlačítko **Connect** v projektu, má tvar `https://xxxx.supabase.co`
    - **Publishable key**: **Settings → API Keys**, začíná `sb_publishable_`

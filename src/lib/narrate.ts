@@ -69,6 +69,8 @@ function batterPhrase(d: PlayDetail, result: PaResult, runs: number): string {
       return 'walks';
     case 'HBP':
       return 'is hit by a pitch';
+    case 'CI':
+      return "reaches on catcher's interference";
     case 'K':
       return (d.batterTo ?? 0) > 0 ? 'strikes out but reaches on a dropped third strike' : 'strikes out';
     case 'ROE':
@@ -135,7 +137,7 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
 
   // the batter beyond the base of his hit, or out at a base (double play, stretching a hit)
   if (result && d.batterTo !== null) {
-    const nominal = HIT_BASES[result] ?? (['BB', 'HBP', 'ROE', 'FC'].includes(result) ? 1 : 0);
+    const nominal = HIT_BASES[result] ?? (['BB', 'HBP', 'ROE', 'FC', 'CI'].includes(result) ? 1 : 0);
     if (d.batterTo === 4 && result !== 'HR') parts.push(`${batter} scores`);
     else if (d.batterTo > nominal && d.batterTo < 4 && nominal > 0) parts.push(`${batter} to ${BASE[d.batterTo]}`);
     else if (d.batterTo === 0 && isHit(result)) parts.push(`${batter} out at ${BASE[nominal + 1]}`);

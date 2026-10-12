@@ -7,6 +7,7 @@
   import { league } from '../league.svelte.ts';
   import { addPlayer, errorMessage, previousLineup, WriteCancelled } from '../api.ts';
   import { toasts } from '../toast.svelte.ts';
+  import { similarName } from '../names.ts';
   import Icon from './Icon.svelte';
 
   let {
@@ -16,6 +17,7 @@
     nextSlot = null,
     saveLabel,
     busy = false,
+    replaceSlot = null,
     onsave,
     oncancel = undefined
   }: {
@@ -27,6 +29,8 @@
     nextSlot?: number | null;
     saveLabel: string;
     busy?: boolean;
+    /** start with this slot being substituted (pinch hitter from the batter card) */
+    replaceSlot?: number | null;
     onsave: (lineup: string[], nextSlot: number | null) => void;
     oncancel?: () => void;
   } = $props();
@@ -37,7 +41,7 @@
   const max = $derived(ten ? 10 : 9);
   const tooMany = $derived(order.length > max);
   let up = $state<number | null>(untrack(() => nextSlot));
-  let replacing = $state<number | null>(null);
+  let replacing = $state<number | null>(untrack(() => replaceSlot));
 
   const team = $derived(league.team(teamId));
   const roster = $derived(
@@ -104,6 +108,11 @@
     tick().then(() => (listEl?.children[to]?.querySelector('.grip') as HTMLElement | null)?.focus());
   }
 
+  // pinch hitter straight from the batter card: show the bench right away
+  onMount(() => {
+    if (replaceSlot !== null) tick().then(() => benchEl?.scrollIntoView({ block: 'start' }));
+  });
+
   // ------------------------------------------------ previous game
   let previous = $state<string[] | null>(null);
   onMount(async () => {
@@ -135,10 +144,23 @@
   let newName = $state('');
   let newNumber = $state('');
   let adding = $state(false);
+  /** players already in the league with a name like the one typed (asked once before adding) */
+  let similar = $state<{ id: string; name: string; jersey: number | null; team: string }[]>([]);
+  let confirmed = $state('');
 
   async function submitPlayer(e: SubmitEvent) {
     e.preventDefault();
     if (!league.season) return;
+    const name = newName.trim();
+    if (confirmed !== name) {
+      similar = league.players
+        .filter((p) => similarName(p.name, name))
+        .map((p) => ({ id: p.id, name: p.name, jersey: p.jersey_number, team: league.team(p.team_id)?.short_name ?? league.team(p.team_id)?.name ?? '' }));
+      if (similar.length) {
+        confirmed = name;
+        return;
+      }
+    }
     const jersey = newNumber.trim() === '' ? null : Number(newNumber);
     if (jersey !== null && (!Number.isInteger(jersey) || jersey < 0 || jersey > 99)) {
       toasts.show('Číslo dresu musí být 0–99.', 'error');
@@ -148,10 +170,16 @@
     try {
       const p = await addPlayer(league.game(gameId)?.season_id ?? league.season.id, teamId, newName, jersey);
       league.upsertPlayer(p);
-      pick(p.id);
-      toasts.show(`Hráč ${p.name} přidán na soupisku.`);
+      if (replacing === null && order.length >= max) {
+        toasts.show(`Sestava je plná (${max}). ${p.name} je na soupisce, do hry ho dáš střídáním (⇄ u hráče v pořadí).`);
+      } else {
+        pick(p.id);
+        toasts.show(`Hráč ${p.name} přidán na soupisku.`);
+      }
       newName = '';
       newNumber = '';
+      similar = [];
+      confirmed = '';
       addOpen = false;
     } catch (err) {
       if (!(err instanceof WriteCancelled)) toasts.show(errorMessage(err), 'error');
@@ -242,8 +270,24 @@
         <form onsubmit={submitPlayer} transition:slide={{ duration: 180 }}>
           <input class="input" placeholder="Příjmení Jméno" bind:value={newName} required minlength="2" maxlength="60" aria-label="Jméno hráče" />
           <input class="input num-in" placeholder="Číslo" inputmode="numeric" bind:value={newNumber} aria-label="Číslo dresu" />
-          <button type="submit" class="btn btn-primary" disabled={adding}>Přidat</button>
-          <button type="button" class="btn btn-quiet" onclick={() => (addOpen = false)}>Zrušit</button>
+          <button type="submit" class="btn btn-primary" disabled={adding}>{similar.length && confirmed === newName.trim() ? 'Přesto přidat' : 'Přidat'}</button>
+          <button type="button" class="btn btn-quiet" onclick={() => { addOpen = false; similar = []; confirmed = ''; }}>Zrušit</button>
+          {#if similar.length && confirmed === newName.trim()}
+            <div class="dup" role="alert">
+              <strong>Podobný hráč už existuje:</strong>
+              <ul>
+                {#each similar as d (d.id)}
+                  <li>
+                    {d.name}{d.jersey != null ? ` #${d.jersey}` : ''} ({d.team})
+                    {#if !order.includes(d.id) && league.player(d.id)?.team_id === teamId}
+                      <button type="button" class="btn btn-quiet btn-sm" onclick={() => { pick(d.id); addOpen = false; similar = []; confirmed = ''; newName = ''; }}>Použít jeho</button>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+              <span class="muted">Jeden hráč hraje jen za jeden tým. Jde-li o jiného hráče, dej Přesto přidat.</span>
+            </div>
+          {/if}
         </form>
       {:else}
         <button type="button" class="btn btn-sm" onclick={() => (addOpen = true)}><Icon name="plus" size={16} /> Hráč, který není na soupisce</button>
@@ -389,6 +433,20 @@
   }
   ol li.up {
     border-color: var(--accent);
+  }
+  .dup {
+    flex-basis: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--accent-soft);
+    font-size: 14px;
+  }
+  .dup ul {
+    margin: 6px 0;
+    padding-left: 18px;
+  }
+  .dup .muted {
+    font-size: 13px;
   }
   ol li.replacing {
     border-color: var(--team, var(--accent));

@@ -42,8 +42,14 @@ export const BATTER_RANGE: Record<PaResult, [Dest, Dest]> = {
   K: [0, 4], // a dropped third strike lets the batter run
   OUT: [0, 0],
   SF: [0, 0],
-  SH: [0, 1]
+  SH: [0, 1],
+  CI: [1, 4] // catcher's interference: batter awarded first base
 };
+
+/** From this inning on every half starts with a runner on 2nd (tie-breaker). */
+export const TIEBREAK_INNING = 8;
+/** A regular game has this many innings. */
+export const REGULATION_INNINGS = 7;
 
 export const occupied = (bases: Bases): Base[] =>
   ([1, 2, 3] as Base[]).filter((b) => bases[b - 1] !== null);
@@ -78,6 +84,7 @@ export function defaultPlay(result: PaResult, bases: Bases, outs: number): Play 
     case '1B':
     case 'BB':
     case 'HBP':
+    case 'CI':
     case 'ROE':
       batterTo = 1;
       for (const b of on) if (f.has(b)) moves.set(b, clamp(b + 1));
@@ -150,6 +157,33 @@ export function defaultRbi(play: Pick<Play, 'result' | 'batterTo' | 'runners'>):
   return Math.min(rbi, 4, runs);
 }
 
+/**
+ * A dropped third strike lets the batter run only with first base empty or two outs.
+ */
+export function mayRunOnDroppedThird(bases: Bases, outs: number): boolean {
+  return !bases[0] || outs >= 2;
+}
+
+/** The play makes the third out. */
+export const endsInning = (play: Pick<Play, 'batterTo' | 'runners'>, outs: number) => outs + outsOn(play) >= 3;
+
+/**
+ * Runs on a play that ends the inning count only when the third out is a runner put out
+ * without a force (a time play). They never count when the batter is out (strikeout,
+ * caught fly, ground out before first) or a runner is forced out.
+ */
+export function runsCountOnThirdOut(play: Pick<Play, 'result' | 'batterTo' | 'runners'>, bases: Bases): boolean {
+  if (!play.result) return true; // runner-only play: e.g. caught stealing after a run scored
+  if (play.batterTo === null || play.batterTo === 0) return false;
+  for (const r of play.runners) {
+    if (r.to !== 0) continue;
+    let forcedOut = true;
+    for (let b = 1; b < r.from; b++) if (!bases[b - 1]) forcedOut = false;
+    if (forcedOut) return false;
+  }
+  return true;
+}
+
 /** Returns a Czech error message, or null when the play is valid. Mirrors live_play(). */
 export function validatePlay(play: Play, bases: Bases, outs: number): string | null {
   const on = occupied(bases);
@@ -176,6 +210,9 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     if (!play.runners.some((r) => r.to !== r.from)) return 'Žádný běžec se neposunul.';
   } else {
     if ((play.result === 'SF' || play.result === 'SH') && outs >= 2) return 'Sacrifice jde jen při méně než 2 outech.';
+    if (play.result === 'K' && (play.batterTo ?? 0) > 0 && !mayRunOnDroppedThird(bases, outs)) {
+      return 'Na dropped third strike smí pálkař běžet jen při volné 1. metě nebo při 2 outech.';
+    }
     const [lo, hi] = BATTER_RANGE[play.result];
     if (play.batterTo === null || play.batterTo < lo || play.batterTo > hi) return 'Pálkař s tímto výsledkem nemůže skončit na zadané metě.';
     if (play.batterTo >= 1 && play.batterTo <= 3) {
@@ -196,6 +233,9 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     }
   }
   if (outs + outsOn(play) > 3) return 'V jedné směně nemohou být víc než 3 outy.';
+  if (endsInning(play, outs) && runsOn(play) > 0 && !runsCountOnThirdOut(play, bases)) {
+    return 'Při 3. outu, kdy je out pálkař nebo force out, se run nepočítá.';
+  }
   return null;
 }
 
@@ -212,7 +252,10 @@ export function applyPlay(state: LiveState, lineup: string[], play: Play): LiveS
   const nextSlot = play.result ? (state.nextSlot + 1) % lineup.length : state.nextSlot;
   const runs = runsOn(play);
   if (total >= 3) {
-    return { inning: state.inning + 1, outs: 0, bases: [null, null, null], nextSlot, runs, inningOver: true };
+    const inning = state.inning + 1;
+    // tie-breaker: the last batter of the previous half starts on 2nd
+    const bases: Bases = [null, inning >= TIEBREAK_INNING && lineup.length ? lineup[(nextSlot - 1 + lineup.length) % lineup.length] : null, null];
+    return { inning, outs: 0, bases, nextSlot, runs, inningOver: true };
   }
   const bases: Bases = [null, null, null];
   for (const r of play.runners) if (r.to >= 1 && r.to <= 3) bases[r.to - 1] = state.bases[r.from - 1];
@@ -226,8 +269,9 @@ export function applyPlay(state: LiveState, lineup: string[], play: Play): LiveS
 export const runnerChoices = (from: Base): Dest[] => [0, ...([1, 2, 3, 4] as Dest[]).filter((d) => d >= from)];
 
 /** Destinations offered for the batter with a given result. */
-export function batterChoices(result: PaResult): Dest[] {
+export function batterChoices(result: PaResult, bases?: Bases, outs?: number): Dest[] {
   const [lo, hi] = BATTER_RANGE[result];
+  if (result === 'K' && bases && outs !== undefined && !mayRunOnDroppedThird(bases, outs)) return [0];
   return ([0, 1, 2, 3, 4] as Dest[]).filter((d) => d >= lo && d <= hi);
 }
 
