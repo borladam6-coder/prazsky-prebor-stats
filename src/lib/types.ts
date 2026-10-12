@@ -110,7 +110,7 @@ export interface TeamGameLine extends BattingCounts, BattingRates {
   players: number;
 }
 
-export type PaResult = '1B' | '2B' | '3B' | 'HR' | 'BB' | 'HBP' | 'K' | 'OUT' | 'FC' | 'ROE' | 'SF' | 'SH';
+export type PaResult = '1B' | '2B' | '3B' | 'HR' | 'BB' | 'HBP' | 'K' | 'OUT' | 'FC' | 'ROE' | 'SF' | 'SH' | 'CI';
 
 export interface PlateAppearance {
   id: string;

@@ -33,7 +33,7 @@
   /** live scoring opens 2 h before the scheduled start */
   const liveOpen = $derived(
     !!game && game.status !== 'cancelled' && game.status !== 'canceled' &&
-      (game.status === 'played' || (!!game.starts_at && new Date(game.starts_at).getTime() <= Date.now() + 2 * 3600_000))
+      league.isPlayable(game)
   );
   let live = $state<LiveSession[]>([]);
   const activeLive = $derived(

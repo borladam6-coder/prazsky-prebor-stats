@@ -11,7 +11,7 @@
   import { outsWord, plural } from '../format.ts';
   import {
     applyPlay, batterChoices, cascade, defaultFieldOut, defaultPlay, defaultRbi, destLabel, fieldOutBatterChoices,
-    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay,
+    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay, endsInning,
     type Base, type Bases, type Dest, type FieldOut, type Play
   } from '../live.ts';
   import type { PaResult } from '../types.ts';
@@ -91,11 +91,20 @@
     play = { ...play, location: play.location === pos ? null : pos };
   }
 
+  /**
+   * The batter makes the third out: the inning is over, so runners can only stay or be
+   * out (nothing they do counts any more).
+   */
+  const isLocked = (p: Play) => !!p.result && p.batterTo === 0 && endsInning(p, outs);
+  const locked = $derived(isLocked(play));
+  const lockRunners = (p: Play): Play =>
+    isLocked(p) ? { ...p, runners: p.runners.map((r) => (r.to === 0 || r.to === r.from ? r : { ...r, to: r.from })) } : p;
+
   /** after any change: push runners ahead, recompute the official result and the RBI */
   function settle(next: Play) {
     let p = cascade(next);
     if (fieldMode && kind) p = { ...p, result: fieldOutResult(kind, p, outs) };
-    play = p;
+    play = lockRunners(p);
     syncRbi();
   }
 
@@ -149,7 +158,7 @@
     return label.toUpperCase() === result ? label : `${result} – ${label}`;
   });
   const recorded = $derived(play.result ? `${play.result} – ${resultDef(play.result)?.label ?? ''}` : null);
-  const batterOptions = $derived(fieldMode && kind ? fieldOutBatterChoices(kind) : result ? batterChoices(result) : []);
+  const batterOptions = $derived(fieldMode && kind ? fieldOutBatterChoices(kind) : result ? batterChoices(result, bases, outs) : []);
 
   function submit(e: SubmitEvent) {
     e.preventDefault();
@@ -214,7 +223,7 @@
       <fieldset class="row">
         <legend><span class="tag">z {r.from}.</span> {name(bases[r.from - 1])}</legend>
         <div class="choices">
-          {#each runnerOptions(r.from, play) as d (d)}
+          {#each runnerOptions(r.from, play).filter((d) => !locked || d === 0 || d === r.from) as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={r.to === d} onclick={() => setRunner(r.from, d)}>
               {destLabel(d, r.from)}
             </button>
@@ -228,6 +237,10 @@
         {/if}
       </fieldset>
     {/each}
+
+    {#if locked && play.runners.length}
+      <p class="locked muted">3. out, směna končí. Běžci zůstávají na metách, run se nepočítá.</p>
+    {/if}
 
     {#if result}
       <div class="rbi">
@@ -496,6 +509,10 @@
     accent-color: var(--accent);
     flex: none;
     margin: 0;
+  }
+  .locked {
+    margin: 0;
+    font-size: 13.5px;
   }
   .rbi {
     display: flex;

@@ -14,13 +14,14 @@
     "test:live": "node --test tests/live.test.ts",
     "test:logic": "node --test tests/live-logic.test.ts",
     "test:corrections": "node --test tests/corrections.test.ts",
-    "test": "node --test tests/narrate.test.ts tests/live-logic.test.ts tests/db.test.ts tests/live.test.ts tests/corrections.test.ts tests/offline.test.ts tests/testgame.test.ts tests/undo.test.ts tests/autofinish.test.ts",
-    "check:server": "tsc --ignoreConfig --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --skipLibCheck --types node netlify/functions/import-league.mts netlify/functions/close-live.mts tests/db.test.ts tests/live.test.ts tests/live-logic.test.ts tests/corrections.test.ts tests/offline.test.ts tests/testgame.test.ts tests/undo.test.ts tests/narrate.test.ts tests/autofinish.test.ts",
+    "test": "node --test tests/narrate.test.ts tests/live-logic.test.ts tests/db.test.ts tests/live.test.ts tests/corrections.test.ts tests/offline.test.ts tests/testgame.test.ts tests/undo.test.ts tests/autofinish.test.ts tests/names.test.ts tests/rules.test.ts",
+    "check:server": "tsc --ignoreConfig --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --skipLibCheck --types node netlify/functions/import-league.mts netlify/functions/close-live.mts tests/db.test.ts tests/live.test.ts tests/live-logic.test.ts tests/corrections.test.ts tests/offline.test.ts tests/testgame.test.ts tests/undo.test.ts tests/narrate.test.ts tests/autofinish.test.ts tests/names.test.ts tests/rules.test.ts",
     "test:offline": "node --test tests/offline.test.ts",
     "test:testgame": "node --test tests/testgame.test.ts",
     "test:undo": "node --test tests/undo.test.ts",
     "test:narrate": "node --test tests/narrate.test.ts",
-    "test:autofinish": "node --test tests/autofinish.test.ts"
+    "test:autofinish": "node --test tests/autofinish.test.ts",
+    "test:rules": "node --test tests/rules.test.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

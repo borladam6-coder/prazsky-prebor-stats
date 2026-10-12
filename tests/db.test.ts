@@ -211,9 +211,9 @@ test('plate appearances: defaults, HR → run, validation', async () => {
   const [outsider] = await q(`select id from players where team_id not in ($1, $2) limit 1`, [game.home_team_id, game.away_team_id]);
   await expectError(pa(c, game.id, outsider.id, '1B'), /nehraje za žádný z týmů/);
 
-  const [future] = await q(`select * from games where status = 'scheduled' and starts_at > now() limit 1`);
+  const [future] = await q(`select * from games where status = 'scheduled' and starts_at > now() + interval '2 days' limit 1`);
   const [futurePlayer] = await q(`select id from players where team_id = $1 limit 1`, [future.home_team_id]);
-  await expectError(pa(c, future.id, futurePlayer.id, '1B'), /jen do odehraných zápasů/);
+  await expectError(pa(c, future.id, futurePlayer.id, '1B'), /od dne zápasu/);
 
   await expectError(bump(c, game.id, p, 'runs', -1), /3 HR|1 HR/);
   await expectError(bump(c, game.id, away[0].id, 'runs', -1), /nemohou být záporné/);

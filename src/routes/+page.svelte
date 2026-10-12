@@ -47,12 +47,11 @@
   const recent = $derived(league.playedGames.slice(0, 3));
   const next = $derived(league.upcomingGames[0]);
   const later = $derived(league.upcomingGames.slice(1, 4));
-  // a game that can be scored live right now (2 h before until 4 h after the scheduled start)
+  // a game of today that can be scored live (from the morning of the game day)
   const liveCandidate = $derived(
     league.games.find((g) => {
       if (!g.starts_at || g.status === 'cancelled' || g.status === 'canceled') return false;
-      const t = new Date(g.starts_at).getTime() - Date.now();
-      return t <= 2 * 3600_000 && t >= -4 * 3600_000;
+      return pragueDay(new Date(g.starts_at)) === pragueDay(new Date());
     })
   );
   const firstToRecord = $derived(league.playedGames.find((g) => (league.recorded.get(g.id) ?? 0) < 2) ?? league.playedGames[0]);

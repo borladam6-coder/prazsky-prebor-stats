@@ -4,6 +4,7 @@
 import { supabase, configProblem } from './supabase.ts';
 import type { Game, Player, Season, Standing, Team } from './types.ts';
 import { TEST_GAME_ID, TEST_SEASON_ID } from './testgame.ts';
+import { isoDay } from './format.ts';
 
 /** Last loaded reference data, shown at once on the next visit while fresh data loads. */
 const CACHE_KEY = 'pps.league.v1';
@@ -253,10 +254,13 @@ class League {
       .map((x) => ({ ...x, ours: ours.get(x.teamId)! }));
   }
 
-  /** A game can receive statistics once it has been played (or its start time has passed). */
+  /**
+   * A game can be scored (live or by hand) from the morning of its game day (Prague time)
+   * or once it is played; same rule as the database (migration 013).
+   */
   isPlayable(g: Game) {
     if (g.status === 'cancelled' || g.status === 'canceled') return false;
-    return g.status === 'played' || (g.starts_at !== null && new Date(g.starts_at).getTime() <= Date.now());
+    return g.status === 'played' || (g.starts_at !== null && isoDay(g.starts_at)! <= isoDay(new Date().toISOString())!);
   }
 
   playedGames = $derived(
