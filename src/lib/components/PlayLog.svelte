@@ -7,6 +7,7 @@
   import { plural } from '../format.ts';
   import { byHalfInning, type PlayItem } from '../plays.ts';
   import { narrate, halfSummary } from '../narrate.ts';
+  import { runnerPlayChip } from '../live.ts';
   import TeamBadge from './TeamBadge.svelte';
   import Icon from './Icon.svelte';
 
@@ -51,7 +52,7 @@
                 </span>
               </span>
             {:else}
-              <span class="chip g-{p.result ? resultDef(p.result)?.group : 'run'}">{p.result ?? 'SB'}</span>
+              <span class="chip g-{p.result ? resultDef(p.result)?.group : 'run'}">{p.result ?? (p.detail ? runnerPlayChip(p.detail.runners) : p.stole.length ? 'SB' : 'BĚH')}</span>
               <span class="desc">
                 {#if p.detail && !p.paDeleted}
                   <span class="story">{narrate(p.detail, p.result, name)}</span>

@@ -80,3 +80,17 @@ test('a hit with the batter out trying for one more base, and the reason he got 
   assert.equal(say({ result: '1B', batterTo: 2, batterExtra: 'error' }), 'Lehký Lukáš singles. Lehký Lukáš to 2nd on an error.');
   assert.equal(say({ result: '2B', batterTo: 3, batterExtra: 'throw' }), 'Lehký Lukáš doubles. Lehký Lukáš to 3rd on the throw.');
 });
+
+test('runner reasons and runner interference', () => {
+  const bare = { batterId: null };
+  assert.equal(say({ ...bare, runners: [{ from: 1, to: 2, why: 'wp', player: 'r1' }] }), 'Krátký Karel to 2nd on a wild pitch.');
+  assert.equal(say({ ...bare, runners: [{ from: 3, to: 4, why: 'pb', player: 'r3' }] }), 'Skokan Sváťa scores.');
+  assert.equal(say({ ...bare, runners: [{ from: 2, to: 3, sb: true, why: 'sb', player: 'r2' }] }), 'Pevný Pavel steals 3rd.');
+  assert.equal(say({ ...bare, runners: [{ from: 1, to: 0, why: 'po', player: 'r1' }] }), 'Krátký Karel picked off 1st.');
+  assert.equal(say({ ...bare, runners: [{ from: 1, to: 0, why: 'cs', player: 'r1' }] }), 'Krátký Karel caught stealing 2nd.');
+  assert.equal(say({ ...bare, runners: [{ from: 1, to: 0, why: null, player: 'r1' }] }), 'Krátký Karel out at 2nd.');
+  assert.equal(say({ result: '1B', kind: 'rhit', batterTo: 1, runners: [{ from: 1, to: 0, why: 'int', player: 'r1' }] }),
+    'Lehký Lukáš singles. Krátký Karel out, hit by the batted ball.');
+  assert.equal(say({ result: 'FC', kind: 'rint', batterTo: 1, runners: [{ from: 2, to: 0, why: 'int', player: 'r2' }] }),
+    "Lehký Lukáš reaches on a fielder's choice. Pevný Pavel out for interference.");
+});

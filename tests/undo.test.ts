@@ -180,7 +180,7 @@ test('play details are kept for the play-by-play (once, with the runners as they
   assert.equal(rows.length, 1);
   assert.deepEqual(
     { kind: rows[0].kind, location: rows[0].location, batter: rows[0].batter_id, outs: rows[0].outs_before, runners: rows[0].runners },
-    { kind: 'dp', location: 'SS', batter: order[1], outs: 0, runners: [{ from: 1, to: 0, sb: false, player: order[0] }] }
+    { kind: 'dp', location: 'SS', batter: order[1], outs: 0, runners: [{ from: 1, to: 0, sb: false, why: null, player: order[0] }] }
   );
   assert.equal((await session()).outs, 2);
   await expectError(t.rpc(c, 'live_play_detailed', { ...args, p_client_id: crypto.randomUUID(), p_kind: 'curve' }), /Neznámý druh/);

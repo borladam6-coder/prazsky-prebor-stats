@@ -1,5 +1,6 @@
 // Game-day scoring, catcher's interference, dropped third strike, runs on the third out,
-// tie-breaker runner (migration 013). Run: npm run test:rules
+// tie-breaker runner (migration 013), out after a hit (014), runner reasons and
+// interference (015). Run: npm run test:rules
 
 import { test, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,11 +14,11 @@ let order: string[];
 
 const session = async (): Promise<Row> => (await t.q(`select * from live_sessions where game_id = $1 and team_id = $2`, [G, TEAM]))[0];
 
-async function play(result: string | null, batterTo: number | null, runners: unknown[] = []) {
+async function play(result: string | null, batterTo: number | null, runners: unknown[] = [], kind: string | null = null) {
   const s = await session();
   return t.rpc(c, 'live_play_detailed', {
     p_client_id: crypto.randomUUID(), p_game_id: G, p_team_id: TEAM, p_expected_version: s.version,
-    p_result: result, p_batter_to: batterTo, p_runners: JSON.stringify(runners), p_rbi: null, p_kind: null, p_location: null
+    p_result: result, p_batter_to: batterTo, p_runners: JSON.stringify(runners), p_rbi: null, p_kind: kind, p_location: null
   });
 }
 async function state(inning: number, outs: number, bases: (string | null)[], nextSlot = 0) {
@@ -115,5 +116,56 @@ test('a hit with the batter out trying for one more base; the reason he got furt
   });
   const [d] = await t.q(`select result, batter_to, batter_extra from live_play_details where game_id = $1 order by created_at desc limit 1`, [G]);
   assert.deepEqual(d, { result: '1B', batter_to: 2, batter_extra: 'error' });
+  assert.deepEqual(await t.as('anon', CONSISTENCY), []);
+});
+
+const lastRunners = async () =>
+  (await t.q(`select runners from live_play_details where game_id = $1 order by created_at desc limit 1`, [G]))[0].runners as Row[];
+const batting = async (player: string) =>
+  (await t.q(`select coalesce(sum(pa), 0)::int pa, coalesce(sum(ab), 0)::int ab, coalesce(sum(h), 0)::int h, coalesce(sum(sb), 0)::int sb
+              from player_game_batting where game_id = $1 and player_id = $2`, [G, player]))[0];
+
+test('runner reasons: SB counts, WP and PB do not; CS and pickoff only on an out', async () => {
+  await state(1, 0, [order[5], null, order[6]], 0);
+  await play(null, null, [{ from: 1, to: 2, sb: false, why: 'wp' }, { from: 3, to: 4, sb: false, why: 'pb' }]);
+  assert.equal((await batting(order[5])).sb, 0, 'a wild pitch is no stolen base');
+  assert.deepEqual((await lastRunners()).map((r) => r.why), ['wp', 'pb']);
+  await play(null, null, [{ from: 2, to: 3, sb: true, why: 'sb' }]);
+  assert.equal((await batting(order[5])).sb, 1);
+  await play(null, null, [{ from: 3, to: 0, why: 'po' }]);
+  assert.equal((await lastRunners())[0].why, 'po');
+  assert.equal((await session()).outs, 1);
+
+  await state(1, 0, [order[5], null, null], 0);
+  await expectError(play(null, null, [{ from: 1, to: 2, sb: true, why: 'wp' }]), /nesouhlasí/);
+  await expectError(play(null, null, [{ from: 1, to: 0, why: 'wp' }]), /jen u postupu/);
+  await expectError(play(null, null, [{ from: 1, to: 2, why: 'cs' }]), /jen u outu/);
+  await expectError(play('1B', 1, [{ from: 1, to: 2, why: 'wp' }]), /mimo odpal/);
+  await expectError(play(null, null, [{ from: 1, to: 2, why: 'xx' }]), /Neznámý důvod/);
+  // without a reason (older pages) still works and is stored as null
+  await play(null, null, [{ from: 1, to: 2 }]);
+  assert.equal((await lastRunners())[0].why, null);
+  assert.deepEqual(await t.as('anon', CONSISTENCY), []);
+});
+
+test('runner interference: hit by the ball is a single, hindering a fielder an FC', async () => {
+  await state(1, 0, [order[5], null, null], 0);
+  await play('1B', 1, [{ from: 1, to: 0, why: 'int' }], 'rhit');
+  assert.deepEqual(await batting(order[0]), { pa: 1, ab: 1, h: 1, sb: 0 });
+  const s = await session();
+  assert.deepEqual([s.outs, s.runner_1], [1, order[0]]);
+  await play('FC', 1, [{ from: 1, to: 0, why: 'int' }], 'rint');
+  assert.deepEqual(await batting(order[1]), { pa: 1, ab: 1, h: 0, sb: 0 });
+
+  await expectError(play('FC', 1, [{ from: 1, to: 0, why: 'int' }], 'rhit'), /interference běžce/);
+  await expectError(play('1B', 2, [{ from: 1, to: 0, why: 'int' }], 'rhit'), /interference běžce/);
+  await expectError(play('1B', 1, [{ from: 1, to: 2 }], 'rhit'), /interference běžce/);
+  await expectError(play('1B', 1, [{ from: 1, to: 0, why: 'int' }], null), /jen u outu běžce při odpalu/);
+
+  // third out by interference: a run does not count
+  await state(1, 2, [order[5], null, order[6]], 3);
+  await expectError(play('1B', 1, [{ from: 1, to: 0, why: 'int' }, { from: 3, to: 4 }], 'rhit'), /run nepočítá/);
+  await play('1B', 1, [{ from: 1, to: 0, why: 'int' }, { from: 3, to: 3 }], 'rhit');
+  assert.equal((await session()).inning, 2);
   assert.deepEqual(await t.as('anon', CONSISTENCY), []);
 });

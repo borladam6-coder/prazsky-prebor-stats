@@ -5,7 +5,7 @@
 
 import type { PaResult } from './types.ts';
 
-export type PlayKind = 'fly' | 'line' | 'pop' | 'ground' | 'fc' | 'dp' | 'bunt';
+export type PlayKind = 'fly' | 'line' | 'pop' | 'ground' | 'fc' | 'dp' | 'bunt' | 'rhit' | 'rint';
 export type FieldPos = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'CF' | 'RF';
 
 export const FIELD_POSITIONS: { pos: FieldPos; label: string; fielder: string }[] = [
@@ -26,6 +26,8 @@ export interface RunnerDetail {
   from: number;
   to: number;
   sb?: boolean;
+  /** 'sb' | 'wp' | 'pb' | 'cs' | 'po' | 'int' (older plays have none) */
+  why?: string | null;
   player: string | null;
 }
 
@@ -123,7 +125,11 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
     if (r.to === 4) {
       parts.push(r.sb && !result && r.from === 3 ? `${who} steals home` : `${who} scores`);
     } else if (r.to === 0) {
-      if (!result) parts.push(`${who} caught stealing ${BASE[r.from + 1]}`);
+      if (r.why === 'int') parts.push(d.kind === 'rhit' ? `${who} out, hit by the batted ball` : `${who} out for interference`);
+      else if (!result && r.why === 'po') parts.push(`${who} picked off ${BASE[r.from]}`);
+      // older plays without a reason were recorded as caught stealing
+      else if (!result && (r.why === 'cs' || r.why === undefined)) parts.push(`${who} caught stealing ${BASE[r.from + 1]}`);
+      else if (!result) parts.push(`${who} out at ${BASE[r.from + 1]}`);
       // a line drive or a pop up catches the runner off the base; on a fly ball he is
       // usually thrown out after tagging up
       else if (d.kind === 'line' || d.kind === 'pop') parts.push(`${who} doubled off ${BASE[r.from]}`);
@@ -132,6 +138,7 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
       else parts.push(`${who} out at ${BASE[r.from + 1]}`);
     } else if (r.to > r.from) {
       if (r.sb && !result) parts.push(r.to === r.from + 1 ? `${who} steals ${BASE[r.to]}` : `${who} steals ${BASE[r.from + 1]}, to ${BASE[r.to]}`);
+      else if (!result && (r.why === 'wp' || r.why === 'pb')) parts.push(`${who} to ${BASE[r.to]} on a ${r.why === 'wp' ? 'wild pitch' : 'passed ball'}`);
       else if (!result) parts.push(`${who} advances to ${BASE[r.to]}`);
       else parts.push(`${who} to ${BASE[r.to]}`);
     }

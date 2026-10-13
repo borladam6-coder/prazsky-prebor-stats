@@ -14,7 +14,7 @@
   import { admin } from '#lib/admin.svelte.ts';
   import { PlayQueue } from '#lib/queue.svelte.ts';
   import { RESULTS, resultDef } from '#lib/stats.ts';
-  import { defaultPlay, runsOn, REGULATION_INNINGS, type Base, type Bases, type Play } from '#lib/live.ts';
+  import { defaultPlay, runsOn, runnerPlayChip, REGULATION_INNINGS, type Base, type Bases, type Play } from '#lib/live.ts';
   import { battingTeam } from '#lib/plays.ts';
   import { outsWord, plural, time } from '#lib/format.ts';
   import { toasts } from '#lib/toast.svelte.ts';
@@ -72,7 +72,7 @@
   /** lineup opened from the batter card: substitute the batter who is up (pinch hitter) */
   let pinchSlot = $state<number | null>(null);
   let moreOpen = $state(false);
-  let sheet = $state<{ result: PaResult | null; runnerFrom: Base | null } | null>(null);
+  let sheet = $state<{ result: PaResult | null; runnerFrom: Base | null; interference?: boolean } | null>(null);
   let confirmFinish = $state(false);
   /** short summary of the last saved play, shown on the scoreboard (toasts would cover the pad) */
   let lastPlay = $state<string | null>(null);
@@ -1052,6 +1052,9 @@
               <button type="button" role="menuitem" disabled={busy} onclick={() => { moreOpen = false; tapResult('CI'); }}>
                 <Icon name="player" size={18} /><span><strong>Catcher's interference (CI)</strong><small>Pálkař na 1. metu kvůli catcherovi: PA, ale ne AB</small></span>
               </button>
+              <button type="button" role="menuitem" disabled={busy || occupiedCount === 0} onclick={() => { moreOpen = false; if (session && !busy) sheet = { result: '1B', runnerFrom: null, interference: true }; }}>
+                <Icon name="swap" size={18} /><span><strong>Interference běžce</strong><small>Běžec trefen odpáleným míčem nebo bránil polaři: běžec out, pálkař na 1. metě</small></span>
+              </button>
               <button type="button" role="menuitemcheckbox" aria-checked={detailed} onclick={toggleDetailed}>
                 <Icon name="tune" size={18} /><span><strong>Podrobný zápis: {detailed ? 'zapnutý' : 'vypnutý'}</strong><small>{detailed ? 'U odpalů se ptá, kam letěl míč (nepovinné), u každého outu jak' : 'Zapni, chceš-li zapisovat, kam letěl míč a druh outu'}</small></span>
               </button>
@@ -1097,7 +1100,7 @@
           <ol class="waiting" aria-label="Akce čekající na odeslání">
             {#each [...(queue?.items ?? [])].reverse() as w (w.id)}
               <li transition:fade={{ duration: 150 }}>
-                <span class="chip">{w.play.result ?? 'SB'}</span>
+                <span class="chip">{w.play.result ?? runnerPlayChip(w.play.runners)}</span>
                 <span>{w.play.result ? (league.player(w.batter)?.name ?? '?') : 'Pohyb běžců'}</span>
                 <span class="muted">{queue?.status === 'offline' ? 'čeká na signál' : queue?.status === 'error' ? 'neuloženo' : 'ukládám…'}</span>
               </li>
@@ -1137,6 +1140,7 @@
   <PlaySheet
     result={sheet.result}
     runnerFrom={sheet.runnerFrom}
+    interference={sheet.interference ?? false}
     {detailed}
     {bases}
     outs={session.outs}
