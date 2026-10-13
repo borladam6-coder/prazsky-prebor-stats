@@ -147,6 +147,12 @@
     background: color-mix(in srgb, var(--bg) 97%, transparent);
     border-bottom: 1px solid var(--line);
   }
+  /* phones while scoring a game: the scoring screen takes the whole height */
+  @media (max-width: 899px) {
+    :global(html.scoring) .top-wrap {
+      display: none;
+    }
+  }
   .top {
     max-width: var(--max);
     margin: 0 auto;

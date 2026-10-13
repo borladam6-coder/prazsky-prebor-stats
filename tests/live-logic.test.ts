@@ -260,3 +260,11 @@ test('runner reasons and runner interference', async () => {
   assert.deepEqual(dests(third), { 1: 2, 3: 0 });
   assert.match(ok({ ...third, runners: [{ from: 1, to: 0, why: 'int' }, { from: 3, to: 4 }], rbi: 0 }, ['r1', null, 'r3'], 2)!, /run nepočítá/);
 });
+
+test('a double or a triple offers out or at least its own base', async () => {
+  const { batterChoices } = await import('../src/lib/live.ts');
+  assert.deepEqual(batterChoices('2B'), [0, 2, 3, 4]);
+  assert.deepEqual(batterChoices('3B'), [0, 3, 4]);
+  assert.deepEqual(batterChoices('1B'), [0, 1, 2, 3, 4]);
+  assert.match(validatePlay({ result: '2B', batterTo: 1, runners: [], rbi: 0 }, EMPTY, 0)!, /nemůže skončit/);
+});

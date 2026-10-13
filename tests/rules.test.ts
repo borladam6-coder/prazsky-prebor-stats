@@ -169,3 +169,11 @@ test('runner interference: hit by the ball is a single, hindering a fielder an F
   assert.equal((await session()).inning, 2);
   assert.deepEqual(await t.as('anon', CONSISTENCY), []);
 });
+
+test('a double or a triple does not end on a lower base', async () => {
+  await state(1, 0, [null, null, null], 0);
+  await expectError(play('2B', 1), /nemůže skončit/);
+  await expectError(play('3B', 2), /nemůže skončit/);
+  await play('2B', 0);
+  assert.equal((await session()).outs, 1);
+});

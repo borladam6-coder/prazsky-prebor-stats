@@ -626,4 +626,79 @@
     flex: 1 1 auto;
     max-width: 240px;
   }
+
+  /* phones: bigger targets and text, Uložit always at the bottom of the sheet */
+  @media (max-width: 639px) {
+    .sheet {
+      max-height: 94dvh;
+      padding-top: 14px;
+    }
+    h2 {
+      font-size: 24px;
+    }
+    .ask {
+      font-size: 15px;
+    }
+    legend {
+      font-size: 17px;
+    }
+    .choices {
+      grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+      gap: 8px;
+    }
+    .ch {
+      min-height: 54px;
+      font-size: 16px;
+      border-radius: 14px;
+    }
+    .xch {
+      min-height: 44px;
+      padding: 4px 16px;
+      font-size: 15px;
+    }
+    .wp {
+      min-height: 48px;
+      font-size: 15px;
+    }
+    .kind {
+      min-height: 56px;
+      align-content: center;
+    }
+    .kind strong {
+      font-size: 17px;
+    }
+    .kinds.compact .kind {
+      min-height: 44px;
+    }
+    .kinds.compact .kind strong {
+      font-size: 14.5px;
+    }
+    .step button {
+      width: 48px;
+      height: 48px;
+    }
+    .val {
+      font-size: 22px;
+    }
+    .preview,
+    .derived {
+      font-size: 15px;
+    }
+    .actions {
+      position: sticky;
+      bottom: calc(-16px - env(safe-area-inset-bottom));
+      z-index: 2;
+      margin: 14px -16px 0;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+    }
+    .actions .btn {
+      min-height: 54px;
+      font-size: 16px;
+    }
+    .actions .btn-primary {
+      max-width: none;
+    }
+  }
 </style>
