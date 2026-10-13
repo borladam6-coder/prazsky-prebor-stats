@@ -16,7 +16,8 @@
     onpick: (code: PaResult) => void;
   } = $props();
 
-  const PAD: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT', 'ROE'];
+  // the most frequent results in the bottom row, where the thumb is
+  const PAD: PaResult[] = ['2B', '3B', 'HR', 'BB', 'HBP', 'ROE', '1B', 'K', 'OUT'];
   const LABELS: Partial<Record<PaResult, string>> = {
     OUT: 'Out v poli: fly out, ground out, fielder’s choice, double play, sacrifice bunt',
     ROE: 'Reached on error'
@@ -81,20 +82,20 @@
   .pad {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 7px;
+    gap: 8px;
   }
   .res {
     position: relative;
     display: grid;
     place-items: center;
-    min-height: 54px;
+    min-height: 64px;
     padding: 6px 4px;
     border-radius: 15px;
     border: 1px solid var(--line);
     background: var(--surface);
     color: var(--ink);
     font-weight: 800;
-    font-size: 21px;
+    font-size: 23px;
     letter-spacing: -0.02em;
     cursor: pointer;
     user-select: none;
@@ -122,9 +123,12 @@
     background: var(--accent);
     opacity: 1;
   }
-  .res:hover {
-    border-color: var(--line-strong);
-    background: var(--surface-3);
+  /* only with a mouse: on a touch screen :hover sticks to the last tapped button */
+  @media (hover: hover) {
+    .res:hover {
+      border-color: var(--line-strong);
+      background: var(--surface-3);
+    }
   }
   .res:active {
     transform: scale(0.95);
@@ -163,7 +167,7 @@
     right: 0;
     transform: none;
   }
-  @media (min-width: 640px) {
+  @media (min-width: 900px) {
     .res {
       min-height: 60px;
       font-size: 22px;

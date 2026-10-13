@@ -647,6 +647,15 @@
       !!team && !!session && !session.finished && mode === 'score'
   );
 
+  // phones: while scoring, the site bar, the back link and the title give way to the
+  // scoreboard and bigger buttons (CSS under html.scoring, only below 900 px)
+  $effect(() => {
+    if (!scoringVisible) return;
+    const root = document.documentElement;
+    root.classList.add('scoring');
+    return () => root.classList.remove('scoring');
+  });
+
   /**
    * The game is over by the score after the regulation innings: home ahead after the top of
    * the 7th (or later), anybody ahead after a complete inning, or a walk-off in the bottom.
@@ -927,6 +936,7 @@
       <!-- ---------------------------------------------------------- scoring -->
       <section class="board card" style:--team={team.color} in:fade={{ duration: 150 }}>
         <div class="sb">
+          <a class="sb-back" href="/zapasy/{id}" aria-label="Zpět na detail zápasu"><Icon name="back" size={20} /></a>
           <div class="inn">
             <span class="k">Směna</span>
             <span class="v">{session.inning}.{#if half}<span class="half" title="{half} polovina">{half === 'horní' ? '▲' : '▼'}</span>{/if}</span>
@@ -1533,6 +1543,53 @@
   }
   .board :global(.diamond) {
     max-width: 280px;
+  }
+  .sb-back {
+    display: none;
+  }
+
+  /* phones while scoring: no site bar, back link or title; the scoreboard is the top */
+  @media (max-width: 899px) {
+    :global(html.scoring) .live {
+      padding-top: calc(8px + env(safe-area-inset-top));
+    }
+    :global(html.scoring) .back,
+    :global(html.scoring) .title {
+      display: none;
+    }
+    :global(html.scoring) .board {
+      padding: 10px 10px 8px;
+    }
+    :global(html.scoring) .sb {
+      gap: 6px;
+    }
+    :global(html.scoring) .sb-back {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 38px;
+      border-radius: 14px;
+      background: var(--surface-2);
+      color: var(--muted);
+    }
+    :global(html.scoring) .inn,
+    :global(html.scoring) .runs {
+      padding: 6px 10px;
+    }
+    :global(html.scoring) .runs .k {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    :global(html.scoring) .undo {
+      min-width: 56px;
+    }
+    :global(html.scoring) .board :global(.diamond) {
+      max-width: 220px;
+    }
+    :global(html.scoring) .atbat {
+      margin-top: 8px;
+      padding: 10px 12px;
+    }
   }
   @media (max-width: 640px) {
     .board :global(.diamond) {

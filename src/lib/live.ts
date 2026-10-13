@@ -279,6 +279,7 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     }
     const [lo, hi] = BATTER_RANGE[play.result];
     if (play.batterTo === null || play.batterTo < lo || play.batterTo > hi) return 'Pálkař s tímto výsledkem nemůže skončit na zadané metě.';
+    if (play.batterTo > 0 && play.batterTo < (HIT_BASE[play.result] ?? 0)) return 'Pálkař s tímto výsledkem nemůže skončit na zadané metě.';
     if (play.batterTo >= 1 && play.batterTo <= 3) {
       if (taken.has(play.batterTo)) return 'Na jedné metě nemohou být dva běžci.';
     }
@@ -336,7 +337,9 @@ export const runnerChoices = (from: Base): Dest[] => [0, ...([1, 2, 3, 4] as Des
 export function batterChoices(result: PaResult, bases?: Bases, outs?: number): Dest[] {
   const [lo, hi] = BATTER_RANGE[result];
   if (result === 'K' && bases && outs !== undefined && !mayRunOnDroppedThird(bases, outs)) return [0];
-  return ([0, 1, 2, 3, 4] as Dest[]).filter((d) => d >= lo && d <= hi);
+  // a hit: out (trying for more) or at least the base of the hit
+  const least = HIT_BASE[result] ?? 0;
+  return ([0, 1, 2, 3, 4] as Dest[]).filter((d) => d >= lo && d <= hi && (d === 0 || d >= least));
 }
 
 export const destLabel = (d: Dest, from?: number): string =>
