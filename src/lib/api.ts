@@ -179,13 +179,14 @@ export async function gamePlayLog(gameId: number, pas: PlateAppearance[] = []): 
   const details = new Map<string, PlayDetail>();
   const { data: rows } = await db()
     .from('live_play_details')
-    .select('group_id, inning, outs_before, batter_id, result, kind, location, batter_to, runners')
+    .select('*')
     .eq('game_id', gameId)
     .limit(2000);
   for (const r of rows ?? []) {
     details.set(r.group_id as string, {
       inning: r.inning, outsBefore: r.outs_before, batterId: r.batter_id, result: r.result, kind: r.kind,
-      location: r.location, batterTo: r.batter_to, runners: (r.runners ?? []) as PlayDetail['runners']
+      location: r.location, batterTo: r.batter_to, runners: (r.runners ?? []) as PlayDetail['runners'],
+      batterExtra: r.batter_extra ?? null
     });
   }
   return buildPlays(groups, ((entries ?? []) as LogEntry[]).filter((e) => live.has(e.group_id)), current, details);
@@ -357,6 +358,7 @@ export async function livePlayOnce(clientId: string, s: Pick<LiveSession, 'game_
         p_rbi: play.result ? play.rbi : null,
         p_kind: play.kind ?? null,
         p_location: play.location ?? null,
+        ...(play.extra ? { p_batter_extra: play.extra } : {}),
         p_actor: actor,
         p_device: identity.device
       })

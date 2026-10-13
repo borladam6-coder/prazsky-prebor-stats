@@ -79,7 +79,8 @@ test('validation catches impossible plays', () => {
   assert.match(validatePlay({ ...base, runners: [{ from: 1, to: 1 }, { from: 2, to: 3 }, { from: 3, to: 4 }] }, LOADED, 0)!, /dva běžci/);
   assert.match(validatePlay({ ...base, runners: [{ from: 1, to: 4 }, { from: 2, to: 3 }, { from: 3, to: 4 }] }, LOADED, 0)!, /předběhnout/);
   assert.match(validatePlay({ ...base, rbi: 2 }, LOADED, 0)!, /RBI/);
-  assert.match(validatePlay({ ...base, batterTo: 0 }, LOADED, 0)!, /nemůže skončit/);
+  assert.match(validatePlay({ ...base, batterTo: 2 }, LOADED, 0)!, /dva běžci/);
+  assert.match(validatePlay({ result: 'BB', batterTo: 0, runners: [], rbi: 0 }, EMPTY, 0)!, /nemůže skončit/);
   assert.match(validatePlay({ result: 'SF', batterTo: 0, runners: [{ from: 3, to: 4 }], rbi: 1 }, [null, null, 'z'], 2)!, /méně než 2/);
   assert.match(validatePlay({ result: null, batterTo: null, runners: [{ from: 1, to: 1 }], rbi: 0 }, ['x', null, null], 0)!, /neposunul/);
   assert.equal(validatePlay({ result: null, batterTo: null, runners: [{ from: 1, to: 2, sb: true }], rbi: 0 }, ['x', null, null], 0), null);
@@ -216,4 +217,46 @@ test('softball rules on the client: dropped third strike, runs on the third out,
   assert.deepEqual([end7.inning, end7.bases], [8, [null, 'd', null]]);
   const end6 = a({ inning: 6, outs: 2, bases: [null, null, null], nextSlot: 3 }, lineup, { result: 'K', batterTo: 0, runners: [], rbi: 0 });
   assert.deepEqual(end6.bases, [null, null, null]);
+});
+
+test('a hit stays a hit when the batter is out trying for one more base', async () => {
+  const { validatePlay: v, outsOn: o, batterChoices: bc } = await import('../src/lib/live.ts');
+  assert.deepEqual(bc('1B'), [0, 1, 2, 3, 4]);
+  const p = { result: '1B' as const, batterTo: 0 as const, runners: [{ from: 2 as const, to: 4 as const }], rbi: 1 };
+  assert.equal(v(p, [null, 'y', null], 0), null);
+  assert.equal(o(p), 1);
+  // third out on the batter tagged after the run crossed: the run counts (time play)
+  assert.equal(v(p, [null, 'y', null], 2), null);
+});
+
+test('runner reasons and runner interference', async () => {
+  const { defaultInterference, markInterference, runnerPlayChip } = await import('../src/lib/live.ts');
+  const one: Bases = ['r1', null, null];
+  const ok = (p: Play, b: Bases = one, outs = 0) => validatePlay(p, b, outs);
+  const runOnly = (why: Play['runners'][0]['why'], to: 0 | 2, sb = why === 'sb'): Play =>
+    ({ result: null, batterTo: null, rbi: 0, runners: [{ from: 1, to, sb, why }] });
+  assert.equal(ok(runOnly('wp', 2)), null);
+  assert.equal(ok(runOnly('sb', 2)), null);
+  assert.match(ok(runOnly('wp', 2, true))!, /nesouhlasí/);
+  assert.match(ok(runOnly('wp', 0))!, /jen u postupu/);
+  assert.equal(ok(runOnly('po', 0)), null);
+  assert.match(ok(runOnly('cs', 2))!, /jen u outu/);
+  assert.equal(runnerPlayChip([{ why: 'pb' }]), 'PB');
+  assert.equal(runnerPlayChip([{ why: 'po' }]), 'PO');
+  assert.equal(runnerPlayChip([{ sb: true }]), 'SB');
+
+  // interference: lead runner out, batter on 1st, runner behind pushed only as needed
+  const p = defaultInterference('rhit', ['r1', 'r2', null], 0);
+  assert.deepEqual([p.result, p.batterTo, dests(p)], ['1B', 1, { 1: 2, 2: 0 }]);
+  assert.equal(ok(p, ['r1', 'r2', null]), null);
+  assert.equal(defaultInterference('rint', one, 0).result, 'FC');
+  // the scorer picks the other runner: the reason follows the out
+  const other = markInterference({ ...p, runners: [{ from: 1, to: 0 }, { from: 2, to: 3 }] });
+  assert.deepEqual(other.runners.map((r) => r.why), ['int', null]);
+  assert.equal(ok(other, ['r1', 'r2', null]), null);
+  assert.match(ok({ ...p, batterTo: 2 }, ['r1', 'r2', null])!, /interference běžce/);
+  // third out by interference: runs do not count
+  const third = defaultInterference('rhit', ['r1', null, 'r3'], 2);
+  assert.deepEqual(dests(third), { 1: 2, 3: 0 });
+  assert.match(ok({ ...third, runners: [{ from: 1, to: 0, why: 'int' }, { from: 3, to: 4 }], rbi: 0 }, ['r1', null, 'r3'], 2)!, /run nepočítá/);
 });

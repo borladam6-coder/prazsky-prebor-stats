@@ -5,7 +5,7 @@
 
 import type { PaResult } from './types.ts';
 
-export type PlayKind = 'fly' | 'line' | 'pop' | 'ground' | 'fc' | 'dp' | 'bunt';
+export type PlayKind = 'fly' | 'line' | 'pop' | 'ground' | 'fc' | 'dp' | 'bunt' | 'rhit' | 'rint';
 export type FieldPos = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'CF' | 'RF';
 
 export const FIELD_POSITIONS: { pos: FieldPos; label: string; fielder: string }[] = [
@@ -26,6 +26,8 @@ export interface RunnerDetail {
   from: number;
   to: number;
   sb?: boolean;
+  /** 'sb' | 'wp' | 'pb' | 'cs' | 'po' | 'int' (older plays have none) */
+  why?: string | null;
   player: string | null;
 }
 
@@ -39,6 +41,8 @@ export interface PlayDetail {
   location: FieldPos | null;
   batterTo: number | null;
   runners: RunnerDetail[];
+  /** why the batter got past the base of his hit: 'error' | 'throw' */
+  batterExtra?: string | null;
 }
 
 const BASE = ['home', '1st', '2nd', '3rd', 'home'];
@@ -121,7 +125,11 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
     if (r.to === 4) {
       parts.push(r.sb && !result && r.from === 3 ? `${who} steals home` : `${who} scores`);
     } else if (r.to === 0) {
-      if (!result) parts.push(`${who} caught stealing ${BASE[r.from + 1]}`);
+      if (r.why === 'int') parts.push(d.kind === 'rhit' ? `${who} out, hit by the batted ball` : `${who} out for interference`);
+      else if (!result && r.why === 'po') parts.push(`${who} picked off ${BASE[r.from]}`);
+      // older plays without a reason were recorded as caught stealing
+      else if (!result && (r.why === 'cs' || r.why === undefined)) parts.push(`${who} caught stealing ${BASE[r.from + 1]}`);
+      else if (!result) parts.push(`${who} out at ${BASE[r.from + 1]}`);
       // a line drive or a pop up catches the runner off the base; on a fly ball he is
       // usually thrown out after tagging up
       else if (d.kind === 'line' || d.kind === 'pop') parts.push(`${who} doubled off ${BASE[r.from]}`);
@@ -130,6 +138,7 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
       else parts.push(`${who} out at ${BASE[r.from + 1]}`);
     } else if (r.to > r.from) {
       if (r.sb && !result) parts.push(r.to === r.from + 1 ? `${who} steals ${BASE[r.to]}` : `${who} steals ${BASE[r.from + 1]}, to ${BASE[r.to]}`);
+      else if (!result && (r.why === 'wp' || r.why === 'pb')) parts.push(`${who} to ${BASE[r.to]} on a ${r.why === 'wp' ? 'wild pitch' : 'passed ball'}`);
       else if (!result) parts.push(`${who} advances to ${BASE[r.to]}`);
       else parts.push(`${who} to ${BASE[r.to]}`);
     }
@@ -139,8 +148,10 @@ export function narrate(d: PlayDetail, result: PaResult | null, name: (id: strin
   if (result && d.batterTo !== null) {
     const nominal = HIT_BASES[result] ?? (['BB', 'HBP', 'ROE', 'FC', 'CI'].includes(result) ? 1 : 0);
     if (d.batterTo === 4 && result !== 'HR') parts.push(`${batter} scores`);
-    else if (d.batterTo > nominal && d.batterTo < 4 && nominal > 0) parts.push(`${batter} to ${BASE[d.batterTo]}`);
-    else if (d.batterTo === 0 && isHit(result)) parts.push(`${batter} out at ${BASE[nominal + 1]}`);
+    else if (d.batterTo > nominal && d.batterTo < 4 && nominal > 0) {
+      const why = d.batterExtra === 'error' ? ' on an error' : d.batterExtra === 'throw' ? ' on the throw' : '';
+      parts.push(`${batter} to ${BASE[d.batterTo]}${why}`);
+    } else if (d.batterTo === 0 && isHit(result)) parts.push(`${batter} out at ${BASE[nominal + 1]} trying to advance`);
     else if (d.batterTo === 0 && (d.kind === 'dp' || d.runners.some((r) => r.to === 0)) && !flyLike(d.kind)) parts.push(`${batter} out at 1st`);
   }
 

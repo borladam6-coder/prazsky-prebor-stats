@@ -11,8 +11,8 @@
   import { outsWord, plural } from '../format.ts';
   import {
     applyPlay, batterChoices, cascade, defaultFieldOut, defaultPlay, defaultRbi, destLabel, fieldOutBatterChoices,
-    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, outsOn, runnerOptions, runsOn, validatePlay, endsInning,
-    type Base, type Bases, type Dest, type FieldOut, type Play
+    fieldOutLabel, fieldOutResult, fieldOutsFor, FIELD_OUTS, occupied, ADVANCE_WHY, OUT_WHY, INTERFERENCE, defaultInterference, markInterference, outsOn, runnerOptions, runsOn, validatePlay, endsInning, nominalBase, outAfterHit,
+    type Base, type Bases, type Dest, type FieldOut, type InterferenceKind, type Play, type RunnerWhy
   } from '../live.ts';
   import type { PaResult } from '../types.ts';
   import { FIELD_POSITIONS, type FieldPos } from '../narrate.ts';
@@ -26,6 +26,7 @@
     nextSlot,
     lineup,
     runnerFrom = null,
+    interference = false,
     detailed = false,
     busy = false,
     onconfirm,
@@ -39,6 +40,8 @@
     lineup: string[];
     /** runner-only play started by tapping this runner */
     runnerFrom?: Base | null;
+    /** runner interference on a batted ball (from the menu): first ask which kind */
+    interference?: boolean;
     /** detailed scoring: where the ball went (optional) and every out asks how */
     detailed?: boolean;
     busy?: boolean;
@@ -63,7 +66,7 @@
       result: null,
       batterTo: null,
       rbi: 0,
-      runners: occupied(bases).map((b) => ({ from: b, to: to.get(b)!, sb: b === runnerFrom }))
+      runners: occupied(bases).map((b) => ({ from: b, to: to.get(b)!, sb: b === runnerFrom, why: b === runnerFrom ? ('sb' as const) : null }))
     };
   }
 
@@ -85,8 +88,17 @@
     if (oneTap && !busy && !validatePlay(play, bases, outs)) onconfirm($state.snapshot(play) as Play);
   }
 
+  /** runner interference: the kind decides the result (1B or FC) */
+  const intMode = untrack(() => interference);
+  let intKind = $state<InterferenceKind | null>(null);
+  function chooseInterference(k: InterferenceKind) {
+    intKind = k;
+    play = defaultInterference(k, bases, outs);
+    rbiTouched = false;
+  }
+
   /** where the ball went: only for balls in play, only in the detailed scoring, never required */
-  const askWhere = untrack(() => detailed && !!result && ['1B', '2B', '3B', 'HR', 'OUT', 'ROE'].includes(result));
+  const askWhere = untrack(() => !interference && detailed && !!result && ['1B', '2B', '3B', 'HR', 'OUT', 'ROE'].includes(result));
   function setWhere(pos: FieldPos) {
     play = { ...play, location: play.location === pos ? null : pos };
   }
@@ -95,7 +107,7 @@
    * The batter makes the third out: the inning is over, so runners can only stay or be
    * out (nothing they do counts any more).
    */
-  const isLocked = (p: Play) => !!p.result && p.batterTo === 0 && endsInning(p, outs);
+  const isLocked = (p: Play) => !!p.result && p.batterTo === 0 && !outAfterHit(p) && endsInning(p, outs);
   const locked = $derived(isLocked(play));
   const lockRunners = (p: Play): Play =>
     isLocked(p) ? { ...p, runners: p.runners.map((r) => (r.to === 0 || r.to === r.from ? r : { ...r, to: r.from })) } : p;
@@ -104,6 +116,7 @@
   function settle(next: Play) {
     let p = cascade(next);
     if (fieldMode && kind) p = { ...p, result: fieldOutResult(kind, p, outs) };
+    if (intMode && intKind) p = markInterference(p);
     play = lockRunners(p);
     syncRbi();
   }
@@ -118,20 +131,31 @@
       ...play,
       runners: play.runners.map((r) => {
         if (r.from !== from) return r;
-        // a stolen base needs a runner-only play and an advance; the tapped runner gets SB by default
-        const advancing = !play.result && to > from;
-        const sb = advancing && (!!r.sb || (r.from === runnerFrom && !(r.to > r.from)));
-        return { ...r, to, sb };
+        // a reason needs a runner-only play: SB/WP/PB with an advance, CS/pickoff with an out;
+        // the tapped runner gets SB (advance) or CS (out) by default, the others none
+        if (play.result) return { ...r, to, sb: false, why: r.why === 'int' ? r.why : null };
+        let why: RunnerWhy | null = null;
+        if (to > from) why = isAdvance(r.why) ? r.why! : r.from === runnerFrom ? 'sb' : null;
+        else if (to === 0) why = isOutWhy(r.why) ? r.why! : r.from === runnerFrom ? 'cs' : null;
+        return { ...r, to, sb: why === 'sb', why };
       })
     });
   }
 
-  function toggleSb(from: Base) {
-    play.runners = play.runners.map((r) => (r.from === from ? { ...r, sb: !r.sb } : r));
+  const isAdvance = (w: RunnerWhy | null | undefined) => w === 'sb' || w === 'wp' || w === 'pb';
+  const isOutWhy = (w: RunnerWhy | null | undefined) => w === 'cs' || w === 'po';
+
+  /** tap a reason; tapping the chosen one again clears it */
+  function setWhy(from: Base, why: RunnerWhy) {
+    play.runners = play.runners.map((r) => {
+      if (r.from !== from) return r;
+      const next = r.why === why ? null : why;
+      return { ...r, why: next, sb: next === 'sb' };
+    });
   }
 
   function setBatter(to: Dest) {
-    settle({ ...play, batterTo: to });
+    settle({ ...play, batterTo: to, extra: result && to > nominalBase(result) && to < 4 ? play.extra : null });
   }
 
   function syncRbi() {
@@ -154,15 +178,18 @@
   const title = $derived.by(() => {
     if (!result) return 'Pohyb běžců';
     if (fieldMode) return kind ? `Out v poli · ${fieldOutLabel(kind, bases).label}` : 'Out v poli';
+    if (intMode) return 'Interference běžce';
     const label = resultDef(result)?.label ?? result;
     return label.toUpperCase() === result ? label : `${result} – ${label}`;
   });
   const recorded = $derived(play.result ? `${play.result} – ${resultDef(play.result)?.label ?? ''}` : null);
-  const batterOptions = $derived(fieldMode && kind ? fieldOutBatterChoices(kind) : result ? batterChoices(result, bases, outs) : []);
+  const batterOptions = $derived(intMode ? [1 as Dest] : fieldMode && kind ? fieldOutBatterChoices(kind) : result ? batterChoices(result, bases, outs) : []);
+  /** the kind of out / interference is chosen (where it is asked) */
+  const ready = $derived((!fieldMode || !!kind) && (!intMode || !!intKind));
 
   function submit(e: SubmitEvent) {
     e.preventDefault();
-    if (!error && !busy && (!fieldMode || kind)) onconfirm($state.snapshot(play) as Play);
+    if (!error && !busy && ready) onconfirm($state.snapshot(play) as Play);
   }
 </script>
 
@@ -197,12 +224,22 @@
         </button>
       {/each}
     </div>
+  {:else if intMode}
+    {#if !intKind}<p class="ask muted">Co se stalo? Míč je mrtvý, běžec out, pálkař jde na 1. metu. Který běžec byl out, změníš níže.</p>{/if}
+    <div class="kinds" class:compact={!!intKind} role="group" aria-label="Druh interference">
+      {#each INTERFERENCE as i (i.kind)}
+        <button type="button" class="kind" aria-pressed={intKind === i.kind} onclick={() => chooseInterference(i.kind)}>
+          <strong>{i.label}</strong>
+          {#if !intKind}<span>{i.hint}</span>{/if}
+        </button>
+      {/each}
+    </div>
   {:else}
     <p class="ask muted">Co se stalo{result ? ' s pálkařem a běžci' : ' s běžci'}? Nabízí se jen to, co je možné.</p>
   {/if}
 
-  {#if !fieldMode || kind}
-  {#if fieldMode && recorded}
+  {#if ready}
+  {#if (fieldMode || intMode) && recorded}
     <p class="derived">Zapíše se: <strong>{recorded}</strong></p>
   {/if}
   <div class="rows">
@@ -212,10 +249,18 @@
         <div class="choices">
           {#each batterOptions as d (d)}
             <button type="button" class="ch" class:out={d === 0} class:home={d === 4} aria-pressed={play.batterTo === d} onclick={() => setBatter(d)}>
-              {d === 0 ? 'Out' : d === 4 ? 'Scored' : `${d}. meta`}
+              {d === 0 ? (result && ['1B', '2B', '3B'].includes(result) ? `Out na ${nominalBase(result) + 1}.` : 'Out') : d === 4 ? 'Scored' : `${d}. meta`}
             </button>
           {/each}
         </div>
+        {#if result && play.batterTo !== null && play.batterTo > nominalBase(result) && play.batterTo < 4}
+          <div class="extra" role="group" aria-label="Proč se dostal dál">
+            <span class="muted">Dál se dostal</span>
+            {#each [['throw', 'na hod'], ['error', 'na error'], [null, 'neuvádět']] as [v, label] (label)}
+              <button type="button" class="xch" aria-pressed={(play.extra ?? null) === v} onclick={() => (play = { ...play, extra: v as Play['extra'] })}>{label}</button>
+            {/each}
+          </div>
+        {/if}
       </fieldset>
     {/if}
 
@@ -229,11 +274,13 @@
             </button>
           {/each}
         </div>
-        {#if !result && r.to > r.from}
-          <label class="sb">
-            <input type="checkbox" checked={!!r.sb} onchange={() => toggleSb(r.from)} />
-            Stolen base (SB) – jinak postup na error, wild pitch, passed ball apod.
-          </label>
+        {#if !result && (r.to > r.from || r.to === 0)}
+          <div class="extra" role="group" aria-label={r.to === 0 ? 'Proč byl out' : 'Proč postoupil'}>
+            <span class="muted">{r.to === 0 ? 'Out' : 'Postup'}</span>
+            {#each r.to === 0 ? OUT_WHY : ADVANCE_WHY as w (w.why)}
+              <button type="button" class="xch" title={w.title} aria-pressed={r.why === w.why} onclick={() => setWhy(r.from, w.why)}>{w.label}</button>
+            {/each}
+          </div>
         {/if}
       </fieldset>
     {/each}
@@ -254,7 +301,7 @@
     {/if}
   </div>
 
-  {#if !fieldMode || kind}
+  {#if ready}
   <p class="preview" aria-live="polite">
     {#if runs}<span class="pill pos">+{runs} {plural(runs, ['run', 'runs', 'runs'])}</span>{/if}
     {#if outsOn(play)}<span class="pill neg">{outsWord(outsOn(play))}</span>{/if}
@@ -268,12 +315,12 @@
 
   {/if}
 
-  {#if error && (!fieldMode || kind)}<p class="err" role="alert">{error}</p>{/if}
+  {#if error && ready}<p class="err" role="alert">{error}</p>{/if}
 
   <div class="actions">
     <button type="button" class="btn btn-quiet" onclick={oncancel}>Zrušit</button>
     {#if !oneTap}
-      <button type="submit" class="btn btn-primary" disabled={!!error || busy || (fieldMode && !kind)}><Icon name="check" size={18} /> Uložit</button>
+      <button type="submit" class="btn btn-primary" disabled={!!error || busy || !ready}><Icon name="check" size={18} /> Uložit</button>
     {/if}
   </div>
 </form>
@@ -495,20 +542,28 @@
     border-color: var(--pos);
     color: #06140c;
   }
-  .sb {
+  .extra {
     display: flex;
-    gap: 8px;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
     margin-top: 10px;
     font-size: 13px;
-    color: var(--muted);
   }
-  .sb input {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent);
-    flex: none;
-    margin: 0;
+  .xch {
+    min-height: 34px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .xch[aria-pressed='true'] {
+    background: var(--pill-active-bg);
+    border-color: var(--pill-active-bg);
+    color: var(--pill-active-ink);
   }
   .locked {
     margin: 0;

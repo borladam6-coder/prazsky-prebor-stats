@@ -15,7 +15,43 @@ export type Bases = [string | null, string | null, string | null];
 export interface RunnerMove {
   from: Base;
   to: Dest;
+  /** stolen base (counts in the statistics); always equal to why === 'sb' when why is set */
   sb?: boolean;
+  /** why the runner moved or was put out (play-by-play only, except SB) */
+  why?: RunnerWhy | null;
+}
+
+/**
+ * Why a runner moved without a batted ball (sb, wp, pb), was put out without one
+ * (cs = caught stealing, po = picked off) or was put out for interference on a batted ball.
+ */
+export type RunnerWhy = 'sb' | 'wp' | 'pb' | 'cs' | 'po' | 'int';
+export const ADVANCE_WHY: { why: RunnerWhy; label: string; title: string }[] = [
+  { why: 'sb', label: 'SB', title: 'Stolen base' },
+  { why: 'wp', label: 'WP', title: 'Wild pitch' },
+  { why: 'pb', label: 'PB', title: 'Passed ball' }
+];
+export const OUT_WHY: { why: RunnerWhy; label: string; title: string }[] = [
+  { why: 'cs', label: 'CS', title: 'Caught stealing' },
+  { why: 'po', label: 'Pickoff', title: 'Picked off' }
+];
+
+/** Runner interference on a batted ball: hit by the ball (batter gets 1B) or hindered a fielder (FC). */
+export type InterferenceKind = 'rhit' | 'rint';
+export const INTERFERENCE: { kind: InterferenceKind; result: PaResult; label: string; hint: string }[] = [
+  { kind: 'rhit', result: '1B', label: 'Běžec trefen odpáleným míčem', hint: 'Běžec je out, pálkař na 1. metu a dostane 1B (hit).' },
+  { kind: 'rint', result: 'FC', label: 'Běžec bránil polaři', hint: 'Běžec je out, pálkař na 1. metu, zapíše se FC (AB bez hitu).' }
+];
+export const isInterference = (k: string | null | undefined): k is InterferenceKind => k === 'rhit' || k === 'rint';
+
+/** Chip for a play without a batter: the reason of the first runner that has one. */
+export function runnerPlayChip(runners: { sb?: boolean; why?: string | null }[] | null | undefined): string {
+  for (const r of runners ?? []) {
+    const w = [...ADVANCE_WHY, ...OUT_WHY].find((x) => x.why === r.why);
+    if (w) return w.why === 'po' ? 'PO' : w.label;
+    if (r.sb) return 'SB';
+  }
+  return 'BĚH';
 }
 
 export interface Play {
@@ -27,13 +63,25 @@ export interface Play {
   kind?: PlayKind | null;
   /** where the ball went (optional, detailed scoring) */
   location?: FieldPos | null;
+  /** why the batter got past the base of his hit (optional): on an error or on the throw */
+  extra?: BatterExtra | null;
 }
+
+export type BatterExtra = 'error' | 'throw';
+const HIT_BASE: Partial<Record<PaResult, number>> = { '1B': 1, '2B': 2, '3B': 3 };
+/** base the result alone gives the batter (1 for a walk, 2 for a double …), 0 for an out */
+export function nominalBase(result: PaResult): number {
+  return HIT_BASE[result] ?? (['BB', 'HBP', 'ROE', 'FC', 'CI'].includes(result) ? 1 : result === 'HR' ? 4 : 0);
+}
+/** the batter is out after a hit: thrown out trying for one more base */
+export const outAfterHit = (p: Pick<Play, 'result' | 'batterTo'>) => !!p.result && p.result in HIT_BASE && p.batterTo === 0;
 
 /** Where a batter may end up with a given result (inclusive range). */
 export const BATTER_RANGE: Record<PaResult, [Dest, Dest]> = {
-  '1B': [1, 4],
-  '2B': [2, 4],
-  '3B': [3, 4],
+  // a hit stays a hit when the batter is then put out trying for one more base (0)
+  '1B': [0, 4],
+  '2B': [0, 4],
+  '3B': [0, 4],
   HR: [4, 4],
   BB: [1, 4],
   HBP: [1, 4],
@@ -174,7 +222,10 @@ export const endsInning = (play: Pick<Play, 'batterTo' | 'runners'>, outs: numbe
  */
 export function runsCountOnThirdOut(play: Pick<Play, 'result' | 'batterTo' | 'runners'>, bases: Bases): boolean {
   if (!play.result) return true; // runner-only play: e.g. caught stealing after a run scored
-  if (play.batterTo === null || play.batterTo === 0) return false;
+  // runner interference: the ball is dead, the out ends the play
+  if (play.runners.some((r) => r.why === 'int')) return false;
+  // batter out after a hit (tagged trying for one more base) is a time play too
+  if (play.batterTo === null || (play.batterTo === 0 && !outAfterHit(play))) return false;
   for (const r of play.runners) {
     if (r.to !== 0) continue;
     let forcedOut = true;
@@ -197,6 +248,12 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     if (!bases[r.from - 1]) return `Na ${r.from}. metě nikdo není.`;
     if (r.to !== 0 && r.to < r.from) return 'Běžec nemůže couvat.';
     if (r.sb && (play.result || r.to === 0 || r.to === r.from)) return 'Stolen base lze zapsat jen mimo odpal a jen s postupem běžce.';
+    if (r.why && !!r.sb !== (r.why === 'sb')) return 'Stolen base nesouhlasí s důvodem postupu.';
+    if ((r.why === 'sb' || r.why === 'wp' || r.why === 'pb') && (play.result || r.to === 0 || r.to <= r.from)) {
+      return 'SB, WP a PB jde zapsat jen u postupu běžce mimo odpal.';
+    }
+    if ((r.why === 'cs' || r.why === 'po') && (play.result || r.to !== 0)) return 'Caught stealing a pickoff jde zapsat jen u outu běžce mimo odpal.';
+    if (r.why === 'int' && (!isInterference(play.kind) || r.to !== 0)) return 'Interference jde zapsat jen u outu běžce při odpalu.';
     if (r.to >= 1 && r.to <= 3) {
       if (taken.has(r.to)) return 'Na jedné metě nemohou být dva běžci.';
       taken.add(r.to);
@@ -204,6 +261,13 @@ export function validatePlay(play: Play, bases: Bases, outs: number): string | n
     pairs.push({ from: r.from, to: r.to });
   }
   for (const b of on) if (!seen.has(b)) return `Chybí, co se stalo s běžcem na ${b}. metě.`;
+
+  if (isInterference(play.kind)) {
+    const def = INTERFERENCE.find((i) => i.kind === play.kind)!;
+    if (play.result !== def.result || play.batterTo !== 1 || play.runners.filter((r) => r.why === 'int').length !== 1) {
+      return 'Při interference běžce je jeden běžec out a pálkař na 1. metě.';
+    }
+  }
 
   if (!play.result) {
     if (play.batterTo !== null || play.rbi) return 'Bez výsledku na pálce nejde zapsat pálkaře ani RBI.';
@@ -309,7 +373,7 @@ export function cascade<T extends Pick<Play, 'result' | 'batterTo' | 'runners'>>
       out.push(r);
     } else {
       const to = opts.find((d) => d > 0 && d >= r.to) ?? opts.find((d) => d > 0) ?? 4;
-      out.push({ ...r, to, sb: r.sb && to > r.from });
+      out.push({ ...r, to, sb: r.sb && to > r.from, why: r.why && to > r.from ? r.why : null });
     }
   }
   return { ...play, runners: play.runners.map((r) => out.find((x) => x.from === r.from)!) };
@@ -423,4 +487,27 @@ export function defaultFieldOut(kind: FieldOut, bases: Bases, outs: number): Pla
   const play: Play = { result: fieldOutResult(kind, base, outs), batterTo, runners, rbi: 0, kind };
   play.rbi = defaultRbi(play);
   return cascade(play);
+}
+
+/**
+ * Runner interference on a batted ball: the lead runner is out (the scorer picks another
+ * one if needed), the batter gets 1st, runners behind are pushed only as far as needed.
+ */
+export function defaultInterference(kind: InterferenceKind, bases: Bases, outs: number): Play {
+  const on = occupied(bases);
+  const victim = on[on.length - 1];
+  const runners: RunnerMove[] = on.map((b) => (b === victim ? { from: b, to: 0, why: 'int' } : { from: b, to: b }));
+  const def = INTERFERENCE.find((i) => i.kind === kind)!;
+  // the ball is dead: nobody moves beyond what the batter on 1st forces (also on the third out)
+  const play: Play = cascade({ result: def.result, batterTo: 1, runners, rbi: 0, kind });
+  play.rbi = defaultRbi(play);
+  return play;
+}
+
+/**
+ * Interference: the runner put out carries why 'int', nobody else does
+ * (after the scorer changed who was out).
+ */
+export function markInterference(play: Play): Play {
+  return { ...play, runners: play.runners.map((r) => ({ ...r, sb: false, why: r.to === 0 ? 'int' : null })) };
 }
