@@ -1036,12 +1036,12 @@
 
       <div class="tools">
         <button type="button" class="btn btn-dark btn-sm" disabled={busy || occupiedCount === 0} onclick={() => (sheet = { result: null, runnerFrom: ([3, 2, 1] as Base[]).find((b) => bases[b - 1]) ?? null })}>
-          <Icon name="swap" size={16} /> Pohyb běžců
+          <Icon name="swap" size={16} /> <span class="tl">Pohyb běžců</span><span class="ts-short">Běžci</span>
         </button>
-        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => openLineup()}><Icon name="player" size={16} /> Pořadí a střídání</button>
+        <button type="button" class="btn btn-dark btn-sm" disabled={busy} onclick={() => openLineup()}><Icon name="player" size={16} /> <span class="tl">Pořadí a střídání</span><span class="ts-short">Sestava</span></button>
         <span class="more-wrap">
           <button type="button" class="btn btn-quiet btn-sm" aria-expanded={moreOpen} aria-haspopup="menu" onclick={() => { moreOpen = !moreOpen; confirmFinish = false; }}>
-            <Icon name="more" size={16} /> Další možnosti
+            <Icon name="more" size={16} /> <span class="tl">Další možnosti</span><span class="ts-short">Další</span>
           </button>
           {#if moreOpen}
             <div class="menu card" role="menu" transition:fade={{ duration: 120 }}>
@@ -1544,7 +1544,8 @@
   .board :global(.diamond) {
     max-width: 280px;
   }
-  .sb-back {
+  .sb-back,
+  .ts-short {
     display: none;
   }
 
@@ -1586,9 +1587,64 @@
     :global(html.scoring) .board :global(.diamond) {
       max-width: 220px;
     }
+    /* batter, tools and the feed heading: compact, the room goes to the buttons */
     :global(html.scoring) .atbat {
       margin-top: 8px;
-      padding: 10px 12px;
+      padding: 8px 10px;
+      column-gap: 10px;
+      row-gap: 2px;
+    }
+    :global(html.scoring) .jn {
+      min-width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      font-size: 20px;
+    }
+    :global(html.scoring) .nm {
+      font-size: 19px;
+    }
+    :global(html.scoring) .today,
+    :global(html.scoring) .next {
+      font-size: 12px;
+    }
+    :global(html.scoring) .pinch {
+      top: 4px;
+      right: 4px;
+    }
+    :global(html.scoring) .tools {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+    :global(html.scoring) .tools > .btn,
+    :global(html.scoring) .more-wrap > .btn {
+      width: 100%;
+      min-height: 40px;
+      padding: 4px 6px;
+      gap: 5px;
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    :global(html.scoring) .tools .tl,
+    :global(html.scoring) .atbat .k {
+      display: none;
+    }
+    :global(html.scoring) .tools .ts-short {
+      display: inline;
+    }
+    :global(html.scoring) .more-wrap .menu {
+      left: auto;
+      right: 0;
+    }
+    :global(html.scoring) .feed {
+      margin-top: 18px;
+    }
+    :global(html.scoring) .feed h2 {
+      font-size: 17px;
+    }
+    :global(html.scoring) .feed-hint {
+      display: none;
     }
   }
   @media (max-width: 640px) {
