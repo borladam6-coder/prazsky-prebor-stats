@@ -12,7 +12,7 @@ Komunitní web s pálkařskými statistikami Pražského přeboru mužů v softb
 - Krok 2: celý web – přehled s tabulkou a nejlepšími pálkaři, zápasy s box score a zápisem statistik, týmy se soupiskou, hráči s filtry, historie změn s vracením. Tmavý a světlý vzhled, mobil na prvním místě.
 - Krok 3: živý zápis – pořadí pálkařů, pálkař po pálkaři, běžci na metách, outy a směny. Doběhy (R) a RBI se dopočítají samy, každou akci jde vrátit. Na přehledu a v detailu zápasu je vidět „Právě se hraje“.
 - Kroky 4–7: zápis obou týmů, sledování, opravy, správce, dva režimy zápisu.
-- Krok 21: na mobilu se po „Začít zápis“ schová horní lišta, nahoře je jen skóre se šipkou zpět. Tlačítka výsledků jsou větší, nejčastější (1B, K, OUT) ve spodní řadě. Okno akce má větší volby a „Uložit“ vždy dole. Double ani triple už nejde zapsat s pálkařem na nižší metě.
+- Krok 21: na mobilu se po „Začít zápis“ schová horní lišta, nahoře je jen skóre se šipkou zpět. Tlačítka výsledků jsou větší (pořadí 1B 2B 3B / HR BB HBP / K OUT ROE), pálkař a nástroje (Běžci, Sestava, Další) jsou kompaktní. Okno akce má větší volby a „Uložit“ vždy dole. Double ani triple už nejde zapsat s pálkařem na nižší metě.
 - Krok 20: u pohybu běžců se vybírá důvod: postup SB / WP / PB (do statistik jde jen SB), out CS / pickoff. V „Další možnosti“ je interference běžce: běžec trefen odpáleným míčem (pálkař 1B) nebo bránil polaři (pálkař FC), běžec je out a pálkař na 1. metě.
 - Krok 19: hit, po kterém je pálkař out při pokusu o další metu („Out na 2.“), zůstává hitem (AB i H) a přibude out; run, který doběhl před tím, platí i při 3. outu. Když se pálkař po hitu nebo BB dostane dál, jde zapsat proč (na hod / na error), v průběhu zápasu pak „to 2nd on an error“.
 - Krok 18: herní pravidla a zápis od dne zápasu.

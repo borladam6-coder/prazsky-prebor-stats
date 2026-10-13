@@ -16,8 +16,7 @@
     onpick: (code: PaResult) => void;
   } = $props();
 
-  // the most frequent results in the bottom row, where the thumb is
-  const PAD: PaResult[] = ['2B', '3B', 'HR', 'BB', 'HBP', 'ROE', '1B', 'K', 'OUT'];
+  const PAD: PaResult[] = ['1B', '2B', '3B', 'HR', 'BB', 'HBP', 'K', 'OUT', 'ROE'];
   const LABELS: Partial<Record<PaResult, string>> = {
     OUT: 'Out v poli: fly out, ground out, fielder’s choice, double play, sacrifice bunt',
     ROE: 'Reached on error'
