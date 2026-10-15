@@ -1,12 +1,15 @@
 <script lang="ts">
   // "Právě se hraje": games with an active live scoring session, updated in real time.
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { slide } from 'svelte/transition';
   import { supabase } from '../supabase.ts';
   import { league } from '../league.svelte.ts';
   import { activeLive, gameRuns } from '../api.ts';
   import type { LiveSession } from '../types.ts';
   import LiveCard from './LiveCard.svelte';
+  import Scoreboard from './Scoreboard.svelte';
+
+  let { featured = false, fallback }: { featured?: boolean; fallback?: Snippet } = $props();
 
   let sessions = $state<LiveSession[]>([]);
   let runs = $state(new Map<number, Map<number, number>>());
@@ -52,7 +55,20 @@
   });
 </script>
 
-{#if games.length}
+{#if featured}
+  {#if games[0]}
+    <Scoreboard game={games[0]} sessions={sessions.filter(s => s.game_id === games[0].id)} runs={runs.get(games[0].id) ?? new Map()} />
+    {#if games.length > 1}
+      <details class="more-live"><summary>Další živé zápasy ({games.length - 1})</summary>
+        {#each games.slice(1) as g (g.id)}
+          <LiveCard game={g} sessions={sessions.filter(s => s.game_id === g.id)} runs={runs.get(g.id) ?? new Map()} href="/zapasy/{g.id}/sledovat" cta="Sledovat" />
+        {/each}
+      </details>
+    {/if}
+  {:else if fallback}
+    {@render fallback()}
+  {/if}
+{:else if games.length}
   <section class="now" aria-labelledby="now-title" transition:slide={{ duration: 250 }}>
     <h2 id="now-title">Právě se hraje</h2>
     <div class="cards">
@@ -70,6 +86,8 @@
 {/if}
 
 <style>
+  .more-live { padding: 10px 0; color: var(--accent-text); font-size: 12px; font-weight: 700; }
+  .more-live summary { cursor: pointer; padding: 8px 0; }
   .now {
     margin: 0 0 28px;
   }

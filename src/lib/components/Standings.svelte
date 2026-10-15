@@ -16,7 +16,7 @@
 
 <section class="card standings" aria-labelledby="standings-title">
   <header>
-    <h2 id="standings-title">Tabulka</h2>
+    <h2 id="standings-title">Tabulka přeboru</h2>
     <span class="src">Pořadí podle <a href="https://softball.cz/ligy/PPM" rel="noopener">softball.cz</a></span>
   </header>
 
@@ -35,6 +35,7 @@
       </tr>
     </thead>
     <tbody>
+      {#if !rows.length}<tr><td colspan="9" class="empty-table">Pořadí týmů se objeví po načtení tabulky soutěže.</td></tr>{/if}
       {#each rows as s, i (s.team_id)}
         {@const team = league.team(s.team_id)}
         <tr class="rise" class:leader={i === 0} style:--i={i}>
@@ -282,4 +283,15 @@
       font-size: 16px;
     }
   }
+  .standings { min-width: 0; }
+  header h2 { font-size: 22px; }
+  .src { font-size: 10px; }
+  table { font-size: 14px; border-spacing: 0; }
+  thead th { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding-bottom: 12px; }
+  tbody td, tbody th { padding-block: 13px; border-top: 1px solid var(--line); }
+  .pts { font-size: 17px; }
+  .empty-table { text-align: left; padding: 24px 14px; color: var(--muted); }
+  @container (max-width: 900px) { .share { display: none; } .full { display: none; } .short { display: inline; } }
+  @container (max-width: 560px) { .wide { display: none; } .team a { gap: 7px; } }
+  @media (max-width: 480px) { header { flex-wrap: wrap; gap: 6px; } header h2 { font-size: 20px; } }
 </style>
