@@ -32,8 +32,8 @@
     flex-shrink: 0;
     width: var(--size);
     height: var(--size);
-    border-radius: calc(var(--size) * 0.28);
-    background: var(--team);
+    border-radius: calc(var(--size) * 0.12);
+    background: color-mix(in srgb, var(--team) 9%, white);
     overflow: hidden;
   }
   .badge.logo {
@@ -46,9 +46,9 @@
     object-fit: contain;
   }
   .ini {
-    color: #fff;
+    color: var(--team);
     font-weight: 800;
-    font-size: calc(var(--size) * 0.36);
+    font-size: calc(var(--size) * 0.42);
     letter-spacing: -0.02em;
   }
 </style>

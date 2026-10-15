@@ -3,7 +3,7 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 const KEY = 'pps.theme';
 
 class Theme {
-  mode = $state<ThemeMode>('system');
+  mode = $state<ThemeMode>('light');
 
   init() {
     let saved: string | null = null;
@@ -12,7 +12,7 @@ class Theme {
     } catch {
       /* ignore */
     }
-    this.apply(saved === 'light' || saved === 'dark' ? saved : 'system', false);
+    this.apply(saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'light', false);
   }
 
   /** Cycles system → light → dark → system. */
@@ -27,8 +27,7 @@ class Theme {
     else root.setAttribute('data-theme', mode);
     if (persist) {
       try {
-        if (mode === 'system') localStorage.removeItem(KEY);
-        else localStorage.setItem(KEY, mode);
+        localStorage.setItem(KEY, mode);
       } catch {
         /* ignore */
       }
